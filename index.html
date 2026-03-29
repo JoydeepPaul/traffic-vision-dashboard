@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrafficVision AI — Intelligent Traffic Violation Detection System</title>
+    <meta name="description" content="Advanced AI-powered traffic monitoring system using YOLOv12, homography-based perspective correction, and real-time speed estimation for smart city surveillance.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+</head>
+<body>
+    <!-- ============ NAVIGATION ============ -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="#" class="nav-logo" id="nav-logo">
+                <span class="logo-icon">
+                    <svg viewBox="0 0 32 32" fill="none">
+                        <path d="M16 2L4 9v14l12 7 12-7V9L16 2z" stroke="currentColor" stroke-width="2" fill="none"/>
+                        <circle cx="16" cy="16" r="4" fill="currentColor"/>
+                        <path d="M16 12v-6M16 20v6M10 16H4M22 16h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                </span>
+                <span class="logo-text">TrafficVision<span class="logo-accent">AI</span></span>
+            </a>
+            <div class="nav-links" id="nav-links">
+                <a href="#hero" class="nav-link active" data-section="hero">Home</a>
+                <a href="#pipeline" class="nav-link" data-section="pipeline">Pipeline</a>
+                <a href="#demo" class="nav-link" data-section="demo">Live Demo</a>
+                <a href="#analytics" class="nav-link" data-section="analytics">Analytics</a>
+                <a href="#violations" class="nav-link" data-section="violations">Violations</a>
+                <a href="#config" class="nav-link" data-section="config">Config</a>
+            </div>
+            <div class="backend-status" id="backend-status" title="Backend server status">
+                <span class="be-dot" id="be-dot"></span>
+                <span class="be-text" id="be-text">Offline</span>
+            </div>
+            <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- ============ HERO SECTION ============ -->
+    <section class="hero" id="hero">
+        <div class="hero-bg">
+            <img src="hero_background.png" alt="" class="hero-bg-image" />
+            <div class="hero-overlay"></div>
+            <div class="hero-grid-lines"></div>
+        </div>
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span class="badge-dot"></span>
+                <span>Powered by YOLOv12 + BoTSORT</span>
+            </div>
+            <h1 class="hero-title">
+                Intelligent Traffic<br>
+                <span class="gradient-text">Violation Detection</span>
+            </h1>
+            <p class="hero-subtitle">
+                Real-time vehicle tracking, speed estimation with homography-based perspective correction, 
+                and automated violation detection — built for smart city surveillance.
+            </p>
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <span class="stat-number" data-count="179">0</span>
+                    <span class="stat-label">Videos Analyzed</span>
+                </div>
+                <div class="hero-stat">
+                    <span class="stat-number" data-count="95">0</span><span class="stat-suffix">%</span>
+                    <span class="stat-label">Detection Accuracy</span>
+                </div>
+                <div class="hero-stat">
+                    <span class="stat-number" data-count="50">0</span><span class="stat-suffix"> fps</span>
+                    <span class="stat-label">Processing Speed</span>
+                </div>
+                <div class="hero-stat">
+                    <span class="stat-number" data-count="5">0</span>
+                    <span class="stat-label">Vehicle Classes</span>
+                </div>
+            </div>
+            <div class="hero-actions">
+                <a href="#demo" class="btn btn-primary" id="btn-try-demo">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    Try Live Demo
+                </a>
+                <a href="#pipeline" class="btn btn-secondary" id="btn-learn-more">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+                    Learn More
+                </a>
+            </div>
+        </div>
+        <div class="hero-scroll-indicator">
+            <div class="scroll-mouse">
+                <div class="scroll-wheel"></div>
+            </div>
+            <span>Scroll to explore</span>
+        </div>
+    </section>
+
+    <!-- ============ PIPELINE SECTION ============ -->
+    <section class="section pipeline-section" id="pipeline">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Architecture</span>
+                <h2 class="section-title">Processing Pipeline</h2>
+                <p class="section-desc">Five-stage architecture from camera calibration to violation reporting, with multi-threaded processing.</p>
+            </div>
+
+            <div class="pipeline-visual">
+                <div class="pipeline-line"></div>
+                
+                <div class="pipeline-stage" data-stage="1">
+                    <div class="stage-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    </div>
+                    <div class="stage-content">
+                        <div class="stage-number">01</div>
+                        <h3>Camera Calibration</h3>
+                        <p>Automatic vanishing point detection via Hough Lines. Computes homography matrix for Bird's Eye View perspective transform.</p>
+                        <div class="stage-tech-tags">
+                            <span>Hough Transform</span>
+                            <span>Homography</span>
+                            <span>BEV</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pipeline-stage" data-stage="2">
+                    <div class="stage-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="15" height="13" rx="2"></rect><polygon points="16 8 20 5.5 20 16.5 16 14 16 8"></polygon></svg>
+                    </div>
+                    <div class="stage-content">
+                        <div class="stage-number">02</div>
+                        <h3>Frame Acquisition</h3>
+                        <p>Multi-threaded producer–consumer pipeline. Dedicated reader thread with 20-frame queue buffer for zero-drop processing.</p>
+                        <div class="stage-tech-tags">
+                            <span>Threading</span>
+                            <span>Queue Buffer</span>
+                            <span>OpenCV</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pipeline-stage" data-stage="3">
+                    <div class="stage-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0022 16z"></path><polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline><polyline points="7.5 19.79 7.5 14.6 3 12"></polyline><polyline points="21 12 16.5 14.6 16.5 19.79"></polyline><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                    </div>
+                    <div class="stage-content">
+                        <div class="stage-number">03</div>
+                        <h3>Detection &amp; Tracking</h3>
+                        <p>YOLOv12x object detection with BoTSORT multi-object tracking. Filters 5 vehicle classes: car, truck, bus, motorbike, bicycle.</p>
+                        <div class="stage-tech-tags">
+                            <span>YOLOv12x</span>
+                            <span>BoTSORT</span>
+                            <span>CUDA</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pipeline-stage" data-stage="4">
+                    <div class="stage-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                    </div>
+                    <div class="stage-content">
+                        <div class="stage-number">04</div>
+                        <h3>Speed Estimation</h3>
+                        <p>Perspective-corrected displacement tracking with IQR-based outlier rejection. Bbox height normalization for scale-invariant speed.</p>
+                        <div class="stage-tech-tags">
+                            <span>Homography Warp</span>
+                            <span>IQR Filter</span>
+                            <span>Scale Norm</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pipeline-stage" data-stage="5">
+                    <div class="stage-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"></path></svg>
+                    </div>
+                    <div class="stage-content">
+                        <div class="stage-number">05</div>
+                        <h3>Violation Detection &amp; Reporting</h3>
+                        <p>Automated speed violation flagging with configurable thresholds. Generates per-video summaries, violation logs, and aggregated analytics.</p>
+                        <div class="stage-tech-tags">
+                            <span>Threshold Engine</span>
+                            <span>CSV Export</span>
+                            <span>Pandas</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ LIVE DEMO SECTION ============ -->
+    <section class="section demo-section" id="demo">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Interactive</span>
+                <h2 class="section-title">Live Detection Simulation</h2>
+                <p class="section-desc">Watch the system detect, track, and estimate speeds of vehicles in real-time.</p>
+            </div>
+
+            <div class="demo-container">
+                <div class="demo-viewport" id="demo-viewport">
+                    <canvas id="demo-canvas" width="960" height="540"></canvas>
+                    <div class="demo-hud">
+                        <div class="hud-top-left">
+                            <div class="hud-item">
+                                <span class="hud-label">FPS</span>
+                                <span class="hud-value" id="hud-fps">0</span>
+                            </div>
+                            <div class="hud-item">
+                                <span class="hud-label">FRAME</span>
+                                <span class="hud-value" id="hud-frame">0</span>
+                            </div>
+                        </div>
+                        <div class="hud-top-right">
+                            <div class="hud-item">
+                                <span class="hud-label">TRACKED</span>
+                                <span class="hud-value" id="hud-tracked">0</span>
+                            </div>
+                            <div class="hud-item hud-violation">
+                                <span class="hud-label">VIOLATIONS</span>
+                                <span class="hud-value" id="hud-violations">0</span>
+                            </div>
+                        </div>
+                        <div class="hud-bottom-center">
+                            <div class="hud-speed-bar">
+                                <div class="speed-bar-fill" id="speed-bar-fill"></div>
+                                <span class="speed-bar-label" id="speed-bar-label">0 km/h</span>
+                                <span class="speed-bar-limit">Limit: 50 km/h</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="demo-overlay-start" id="demo-overlay-start">
+                        <button class="demo-play-btn" id="demo-play-btn">
+                            <svg viewBox="0 0 48 48" width="64" height="64" fill="none"><circle cx="24" cy="24" r="23" stroke="currentColor" stroke-width="2"/><polygon points="19 15 19 33 35 24" fill="currentColor"/></svg>
+                        </button>
+                        <p>Click to start simulation</p>
+                    </div>
+                </div>
+                <div class="demo-sidebar">
+                    <h3>Detection Log</h3>
+                    <div class="detection-log" id="detection-log">
+                        <div class="log-placeholder">Start the simulation to see detections...</div>
+                    </div>
+                    <div class="demo-controls">
+                        <button class="btn btn-sm btn-primary" id="btn-reset-demo">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 102.13-9.36L1 10"></path></svg>
+                            Reset
+                        </button>
+                        <div class="speed-control">
+                            <label for="sim-speed">Speed:</label>
+                            <input type="range" id="sim-speed" min="0.5" max="3" step="0.5" value="1">
+                            <span id="sim-speed-label">1×</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ ANALYTICS SECTION ============ -->
+    <section class="section analytics-section" id="analytics">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Dashboard</span>
+                <h2 class="section-title">Analytics Overview</h2>
+                <p class="section-desc">Comprehensive analysis of detection performance, speed distributions, and system metrics across all processed videos.</p>
+            </div>
+
+            <!-- KPI Cards -->
+            <div class="kpi-grid">
+                <div class="kpi-card" id="kpi-videos">
+                    <div class="kpi-icon kpi-icon-blue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-value" data-count="179">0</span>
+                        <span class="kpi-label">Videos Processed</span>
+                    </div>
+                    <div class="kpi-trend kpi-trend-up">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                        100%
+                    </div>
+                </div>
+                <div class="kpi-card" id="kpi-vehicles">
+                    <div class="kpi-icon kpi-icon-green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 11l2-5h14l2 5M1 11h18v6H1zM5 17a2 2 0 100 4 2 2 0 000-4zM15 17a2 2 0 100 4 2 2 0 000-4z"></path></svg>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-value" data-count="4827">0</span>
+                        <span class="kpi-label">Vehicles Detected</span>
+                    </div>
+                    <div class="kpi-trend kpi-trend-up">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                        95.3%
+                    </div>
+                </div>
+                <div class="kpi-card" id="kpi-accuracy">
+                    <div class="kpi-icon kpi-icon-purple">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-value kpi-value-pct" data-count="95.3">0</span><span class="kpi-suffix">%</span>
+                        <span class="kpi-label">Detection Accuracy</span>
+                    </div>
+                    <div class="kpi-trend kpi-trend-up">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                        +2.1%
+                    </div>
+                </div>
+                <div class="kpi-card" id="kpi-fps">
+                    <div class="kpi-icon kpi-icon-orange">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-value" data-count="48">0</span><span class="kpi-suffix"> fps</span>
+                        <span class="kpi-label">Effective FPS</span>
+                    </div>
+                    <div class="kpi-trend kpi-trend-neutral">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        Stable
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="charts-grid">
+                <div class="chart-card chart-card-wide">
+                    <div class="chart-header">
+                        <h3>Detection Accuracy per Video</h3>
+                        <div class="chart-legend">
+                            <span class="legend-dot legend-dot-blue"></span> Detected
+                            <span class="legend-dot legend-dot-green"></span> Ground Truth
+                        </div>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="chart-accuracy"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>Vehicle Class Distribution</h3>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="chart-classes"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>Speed Distribution</h3>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="chart-speed"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card chart-card-wide">
+                    <div class="chart-header">
+                        <h3>Processing Time vs Frame Count</h3>
+                        <div class="chart-legend">
+                            <span class="legend-dot legend-dot-purple"></span> Time (s)
+                            <span class="legend-dot legend-dot-orange"></span> Frames
+                        </div>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="chart-processing"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ VIOLATIONS TABLE SECTION ============ -->
+    <section class="section violations-section" id="violations">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Enforcement</span>
+                <h2 class="section-title">Speed Violation Tracker</h2>
+                <p class="section-desc">Flagged vehicles exceeding the configurable speed threshold with full audit trail.</p>
+            </div>
+
+            <div class="violations-dashboard">
+                <div class="violations-summary-cards">
+                    <div class="v-summary-card v-card-total">
+                        <span class="v-summary-value" id="v-total">342</span>
+                        <span class="v-summary-label">Total Violations</span>
+                    </div>
+                    <div class="v-summary-card v-card-avg">
+                        <span class="v-summary-value" id="v-avg-speed">67.4</span>
+                        <span class="v-summary-label">Avg Violation Speed (km/h)</span>
+                    </div>
+                    <div class="v-summary-card v-card-max">
+                        <span class="v-summary-value" id="v-max-speed">128.9</span>
+                        <span class="v-summary-label">Max Speed Recorded (km/h)</span>
+                    </div>
+                    <div class="v-summary-card v-card-rate">
+                        <span class="v-summary-value" id="v-rate">7.1%</span>
+                        <span class="v-summary-label">Violation Rate</span>
+                    </div>
+                </div>
+
+                <div class="violations-table-container">
+                    <div class="table-controls">
+                        <div class="table-search">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input type="text" id="violation-search" placeholder="Search by Track ID or Video..." />
+                        </div>
+                        <div class="table-filters">
+                            <select id="severity-filter">
+                                <option value="all">All Severity</option>
+                                <option value="low">Low (0–10 km/h excess)</option>
+                                <option value="medium">Medium (10–30 km/h)</option>
+                                <option value="high">High (30+ km/h)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="violations-table" id="violations-table">
+                            <thead>
+                                <tr>
+                                    <th>Track ID</th>
+                                    <th>Video</th>
+                                    <th>Frame</th>
+                                    <th>Speed (km/h)</th>
+                                    <th>Threshold</th>
+                                    <th>Excess</th>
+                                    <th>Confidence</th>
+                                    <th>Severity</th>
+                                </tr>
+                            </thead>
+                            <tbody id="violations-tbody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="table-pagination" id="table-pagination">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ CONFIG SECTION ============ -->
+    <section class="section config-section" id="config">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Settings</span>
+                <h2 class="section-title">System Configuration</h2>
+                <p class="section-desc">Fine-tune detection parameters and model settings for optimal performance.</p>
+            </div>
+
+            <div class="config-layout">
+                <div class="config-panel">
+                    <div class="config-group">
+                        <h3>
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0022 16z"></path></svg>
+                            Model Settings
+                        </h3>
+                        <div class="config-row">
+                            <label for="cfg-model">Model</label>
+                            <select id="cfg-model">
+                                <option value="yolo12n.pt">YOLOv12n (Nano)</option>
+                                <option value="yolo12s.pt">YOLOv12s (Small)</option>
+                                <option value="yolo12m.pt">YOLOv12m (Medium)</option>
+                                <option value="yolo12l.pt">YOLOv12l (Large)</option>
+                                <option value="yolo12x.pt" selected>YOLOv12x (XLarge)</option>
+                            </select>
+                        </div>
+                        <div class="config-row">
+                            <label for="cfg-tracker">Tracker</label>
+                            <select id="cfg-tracker">
+                                <option value="botsort.yaml" selected>BoTSORT</option>
+                                <option value="bytetrack.yaml">ByteTrack</option>
+                            </select>
+                        </div>
+                        <div class="config-row">
+                            <label for="cfg-device">Device</label>
+                            <div class="device-indicator">
+                                <span class="device-badge" id="cfg-device-badge">CUDA</span>
+                                <span class="device-name" id="cfg-device-name">GPU Accelerated</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="config-group">
+                        <h3>
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"></path></svg>
+                            Detection Parameters
+                        </h3>
+                        <div class="config-row">
+                            <label for="cfg-conf">Confidence Threshold</label>
+                            <div class="slider-group">
+                                <input type="range" id="cfg-conf" min="0.1" max="0.9" step="0.05" value="0.5">
+                                <span class="slider-value" id="cfg-conf-val">0.50</span>
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <label for="cfg-iou">IoU Threshold</label>
+                            <div class="slider-group">
+                                <input type="range" id="cfg-iou" min="0.1" max="0.9" step="0.05" value="0.5">
+                                <span class="slider-value" id="cfg-iou-val">0.50</span>
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <label for="cfg-min-frames">Min Frames to Count</label>
+                            <div class="slider-group">
+                                <input type="range" id="cfg-min-frames" min="5" max="50" step="5" value="25">
+                                <span class="slider-value" id="cfg-min-frames-val">25</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="config-group">
+                        <h3>
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                            Speed Estimation
+                        </h3>
+                        <div class="config-row">
+                            <label for="cfg-speed">Speed Threshold (km/h)</label>
+                            <div class="slider-group">
+                                <input type="range" id="cfg-speed" min="20" max="150" step="5" value="50">
+                                <span class="slider-value" id="cfg-speed-val">50</span>
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <label for="cfg-history">Track History Limit</label>
+                            <div class="slider-group">
+                                <input type="range" id="cfg-history" min="30" max="300" step="10" value="120">
+                                <span class="slider-value" id="cfg-history-val">120</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Launch Analysis ─────────────────────── -->
+                <div class="config-group config-launch-group">
+                    <h3>
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                        Launch Analysis
+                    </h3>
+
+                    <div class="config-row">
+                        <label for="cfg-dataset">Dataset Folder Path</label>
+                        <input type="text" id="cfg-dataset" class="path-input"
+                               placeholder="e.g. D:\datasets\179_videos" />
+                    </div>
+
+                    <div class="config-row">
+                        <label for="cfg-max-videos">Videos to Process</label>
+                        <div class="slider-group">
+                            <input type="range" id="cfg-max-videos" min="1" max="179" step="1" value="10">
+                            <span class="slider-value" id="cfg-max-videos-val">10</span>
+                        </div>
+                    </div>
+
+                    <div class="launch-actions">
+                        <button class="btn btn-launch" id="btn-run-analysis" title="Run the ML pipeline on your dataset">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            Run Analysis
+                        </button>
+                        <button class="btn btn-stop-run" id="btn-stop-analysis" style="display:none">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect></svg>
+                            Stop
+                        </button>
+                    </div>
+
+                    <div class="launch-hint" id="launch-hint">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+                        Start <code>start_backend.bat</code> first, then enter your dataset path above.
+                    </div>
+                </div>
+
+                <div class="config-preview">
+                    <div class="config-code-block">
+                        <div class="code-header">
+                            <span class="code-file">config.json</span>
+                            <button class="code-copy-btn" id="btn-copy-config">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
+                                Copy
+                            </button>
+                        </div>
+                        <pre class="code-content"><code id="config-json">{
+  "model_name": "yolo12x.pt",
+  "tracker_yaml": "botsort.yaml",
+  "conf_threshold": 0.50,
+  "iou_threshold": 0.50,
+  "speed_threshold_kmph": 50,
+  "min_frames_to_count": 25,
+  "history_limit": 120
+}</code></pre>
+                    </div>
+                    <img src="traffic_analysis.png" alt="Smart traffic analysis illustration" class="config-illustration" />
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ RUN PROGRESS SECTION ============ -->
+    <section class="run-progress-section" id="run-progress-section" style="display:none">
+        <div class="container">
+            <div class="run-progress-panel">
+                <div class="rp-header">
+                    <div class="rp-title">
+                        <span class="rp-spinner" id="rp-spinner"></span>
+                        <span id="rp-title-text">Running Analysis…</span>
+                    </div>
+                    <span class="rp-video-name" id="rp-video-name"></span>
+                </div>
+
+                <div class="rp-bar-wrap">
+                    <div class="rp-bar-track">
+                        <div class="rp-bar-fill" id="rp-bar-fill"></div>
+                    </div>
+                    <span class="rp-pct" id="rp-pct">0%</span>
+                </div>
+
+                <div class="rp-counters">
+                    <span class="rp-count">
+                        <strong id="rp-current">0</strong> / <strong id="rp-total">0</strong> videos
+                    </span>
+                    <span class="rp-status-badge" id="rp-status-badge">Initializing</span>
+                </div>
+
+                <div class="rp-log" id="rp-log"></div>
+
+                <div class="rp-view-results" id="rp-view-results" style="display:none">
+                    <a href="#analytics" class="btn btn-primary" id="btn-view-results">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                        View Results
+                    </a>
+                    <button class="btn btn-secondary" id="btn-run-again" style="margin-left:12px">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 102.13-9.36L1 10"></path></svg>
+                        Run Again
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="footer" id="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="logo-icon">
+                        <svg viewBox="0 0 32 32" fill="none">
+                            <path d="M16 2L4 9v14l12 7 12-7V9L16 2z" stroke="currentColor" stroke-width="2" fill="none"/>
+                            <circle cx="16" cy="16" r="4" fill="currentColor"/>
+                        </svg>
+                    </span>
+                    <span class="logo-text">TrafficVision<span class="logo-accent">AI</span></span>
+                    <p class="footer-tagline">Intelligent Traffic Violation Detection System</p>
+                </div>
+                <div class="footer-tech">
+                    <h4>Tech Stack</h4>
+                    <div class="tech-badges">
+                        <span>YOLOv12</span>
+                        <span>PyTorch</span>
+                        <span>OpenCV</span>
+                        <span>BoTSORT</span>
+                        <span>NumPy</span>
+                        <span>Pandas</span>
+                        <span>CUDA</span>
+                    </div>
+                </div>
+                <div class="footer-links-col">
+                    <h4>Quick Links</h4>
+                    <a href="#pipeline">Pipeline</a>
+                    <a href="#demo">Live Demo</a>
+                    <a href="#analytics">Analytics</a>
+                    <a href="#violations">Violations</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 TrafficVision AI. Built with advanced computer vision and deep learning.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="index.js"></script>
+</body>
+</html>
