@@ -918,7 +918,8 @@ function initDemoSimulation() {
 // ============================================================
 
 const API_BASE = 'http://localhost:5000';
-const BACKEND_DOWNLOAD_URL = 'https://github.com/joydeep-paul/traffic-vision-dashboard/releases/download/v1.0/trafficvision-backend.zip';
+// Link to the downloadable-backend folder on GitHub
+const BACKEND_FOLDER_URL = 'https://github.com/joydeep-paul/traffic-vision-dashboard/tree/master/downloadable-backend';
 let _sseSource = null;
 let _isRunning  = false;
 let _gpuInfo = null;
@@ -1162,16 +1163,18 @@ async function downloadBackend() {
                     </div>
                 </div>
                 
-                <a href="${BACKEND_DOWNLOAD_URL}" class="btn btn-primary download-btn-main" download>
+                <a href="${BACKEND_FOLDER_URL}" target="_blank" class="btn btn-primary download-btn-main">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"></path>
+                        <polyline points="15 3 21 3 21 9"></polyline>
+                        <line x1="10" y1="14" x2="21" y2="3"></line>
                     </svg>
-                    Download trafficvision-backend.zip
+                    Open Download Folder on GitHub
                 </a>
                 
-                <p class="download-note">
+                <p class="download-note" style="margin-top: 12px;">
+                    <strong>How to download:</strong> Click the button above → Click the green "Code" button → "Download ZIP"<br>
+                    Then extract and navigate to the <code>downloadable-backend</code> folder.<br><br>
                     <strong>Requirements:</strong> Python 3.10+, ~2GB disk space<br>
                     <strong>GPU Support:</strong> NVIDIA (CUDA), AMD (ROCm), Apple Silicon (MPS)
                 </p>
