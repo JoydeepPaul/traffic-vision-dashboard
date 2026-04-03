@@ -932,8 +932,11 @@ document.addEventListener('DOMContentLoaded', () => {
 function detectGPU() {
     try {
         const canvas = document.createElement('canvas');
-        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-        if (!gl) return null;
+        
+        // Try to force high-performance GPU
+        const gl = canvas.getContext('webgl', { powerPreference: 'high-performance' }) 
+                || canvas.getContext('experimental-webgl', { powerPreference: 'high-performance' });
+        if (!gl) return { primary: null, note: null };
         
         const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
         if (debugInfo) {
@@ -947,9 +950,16 @@ function detectGPU() {
                 .replace(/OpenGL Engine/g, '')
                 .trim();
             
+            // Detect if it's NVIDIA (dedicated) or AMD/Intel (likely integrated)
+            const isNvidia = gpuName.includes('NVIDIA') || gpuName.includes('GeForce');
+            const isAmdDedicated = gpuName.includes('Radeon RX') || gpuName.includes('Radeon R9') || gpuName.includes('Radeon R7');
+            const isIntegrated = gpuName.includes('Intel') || (gpuName.includes('AMD') && !isAmdDedicated) || gpuName.includes('Vega');
+            
             // Shorten common GPU names
-            if (gpuName.includes('NVIDIA')) {
-                gpuName = gpuName.match(/NVIDIA\s*(GeForce\s*)?([A-Z0-9\s]+)/i)?.[0] || gpuName;
+            if (gpuName.includes('NVIDIA') || gpuName.includes('GeForce')) {
+                gpuName = gpuName.match(/NVIDIA\s*GeForce\s*[A-Z0-9\s]+/i)?.[0] 
+                       || gpuName.match(/GeForce\s*[A-Z0-9\s]+/i)?.[0] 
+                       || gpuName;
             } else if (gpuName.includes('AMD') || gpuName.includes('Radeon')) {
                 gpuName = gpuName.match(/(AMD|Radeon)[^\,]*/i)?.[0] || gpuName;
             } else if (gpuName.includes('Intel')) {
@@ -957,15 +967,22 @@ function detectGPU() {
             }
             
             // Truncate if still too long
+            gpuName = gpuName.trim();
             if (gpuName.length > 25) {
                 gpuName = gpuName.substring(0, 22) + '...';
             }
             
-            return gpuName;
+            // Add note if using integrated GPU
+            let note = null;
+            if (isIntegrated && !isNvidia) {
+                note = 'Using integrated GPU. For NVIDIA GTX 1650: Windows Settings → Graphics → Set browser to High Performance';
+            }
+            
+            return { primary: gpuName, note: note, isIntegrated: isIntegrated };
         }
-        return 'GPU Detected';
+        return { primary: 'GPU Detected', note: null };
     } catch (e) {
-        return null;
+        return { primary: null, note: null };
     }
 }
 
@@ -977,11 +994,16 @@ async function checkBackendHealth() {
     const deviceNameEl = document.getElementById('cfg-device-name');
     
     // First, detect GPU using WebGL (browser-based)
-    const detectedGPU = detectGPU();
+    const gpuInfo = detectGPU();
     
     // Update the config device name if GPU detected
-    if (deviceNameEl && detectedGPU) {
-        deviceNameEl.textContent = detectedGPU;
+    if (deviceNameEl && gpuInfo.primary) {
+        deviceNameEl.textContent = gpuInfo.primary;
+        // Show tooltip if using integrated GPU
+        if (gpuInfo.note) {
+            deviceNameEl.title = gpuInfo.note;
+            deviceNameEl.style.cursor = 'help';
+        }
     }
     
     try {
@@ -995,9 +1017,18 @@ async function checkBackendHealth() {
         if (btnRun) btnRun.disabled = false;
     } catch {
         // Backend offline, but we can still show GPU info from browser detection
-        if (detectedGPU) {
+        if (gpuInfo.primary) {
             badge.className = 'backend-status online';
-            txt.textContent = `Online · ${detectedGPU}`;
+            const gpuLabel = gpuInfo.isIntegrated ? `${gpuInfo.primary} (iGPU)` : gpuInfo.primary;
+            txt.textContent = `Online · ${gpuLabel}`;
+            // Add tooltip for integrated GPU warning
+            if (gpuInfo.note) {
+                txt.title = gpuInfo.note;
+                txt.style.cursor = 'help';
+            }
+        } else {
+            badge.className = 'backend-status error';
+            txt.textContent = 'Offline';
         } else {
             badge.className = 'backend-status error';
             txt.textContent = 'Offline';
