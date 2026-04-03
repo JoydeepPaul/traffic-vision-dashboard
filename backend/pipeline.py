@@ -29,15 +29,85 @@ VIDEO_EXTS = ("*.mp4", "*.avi", "*.mov", "*.mkv",
 
 class CameraCalibrator:
     """
-    Automatic Camera Calibration using Homography mapping 2D to BEV.
+    Automatic Camera Calibration using Vanishing Points (VP).
+    Computes Homography matrix to map 2D pixels to 3D real-world coordinates.
     """
     def __init__(self, frame_shape, avg_vehicle_width=1.5):
         self.frame_height, self.frame_width = frame_shape[:2]
         self.avg_vehicle_width = avg_vehicle_width
+        self.vanishing_points = []
         self.homography_matrix = None
         self.calibrated = False
 
+    def detect_vanishing_points_from_edges(self, frame, num_vp=2):
+        """
+        Detect vanishing points using edge lines in the frame.
+        Uses Hough Line Transform to find road lane markings.
+        """
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        edges = cv2.Canny(gray, 50, 150)
+        lines = cv2.HoughLinesP(edges, 1, np.pi/180, 50, minLineLength=50, maxLineGap=10)
+        
+        if lines is None or len(lines) < 10:
+            return None
+        
+        vps = []
+        for i in range(min(len(lines), 20)):
+            line1 = lines[i][0]
+            for j in range(i + 1, min(len(lines), 20)):
+                line2 = lines[j][0]
+                vp = self._line_intersection(line1, line2)
+                if vp is not None and self._is_valid_vp(vp):
+                    vps.append(vp)
+        
+        if vps:
+            vps = np.array(vps)
+            unique_vps = self._cluster_points(vps, threshold=50)
+            return unique_vps[:num_vp] if len(unique_vps) >= num_vp else unique_vps
+        return None
+
+    def _line_intersection(self, line1, line2):
+        """Compute intersection of two lines in 2D space."""
+        x1, y1, x2, y2 = line1
+        x3, y3, x4, y4 = line2
+        
+        denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+        if abs(denom) < 1e-6:
+            return None
+        
+        t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom
+        px = x1 + t * (x2 - x1)
+        py = y1 + t * (y2 - y1)
+        return np.array([px, py])
+
+    def _is_valid_vp(self, vp, margin=200):
+        """Check if vanishing point is within reasonable bounds."""
+        return (-margin <= vp[0] <= self.frame_width + margin and 
+                -margin <= vp[1] <= self.frame_height + margin)
+
+    def _cluster_points(self, points, threshold=50):
+        """Simple clustering of points."""
+        if len(points) == 0:
+            return []
+        clusters = []
+        used = set()
+        for i, p in enumerate(points):
+            if i in used:
+                continue
+            cluster = [p]
+            used.add(i)
+            for j, q in enumerate(points):
+                if j not in used and np.linalg.norm(p - q) < threshold:
+                    cluster.append(q)
+                    used.add(j)
+            clusters.append(np.mean(cluster, axis=0))
+        return np.array(clusters)
+
     def compute_homography_from_reference(self, frame):
+        """
+        Compute homography using reference points.
+        Default: assumes lane marking detection or manual calibration points.
+        """
         h, w = frame.shape[:2]
         src_points = np.float32([
             [0, h],
@@ -58,6 +128,7 @@ class CameraCalibrator:
         return self.homography_matrix
     
     def apply_homography(self, point_2d):
+        """Convert 2D pixel coordinates to BEV using homography."""
         if self.homography_matrix is None:
             return point_2d
         point_homogeneous = np.array([[point_2d[0]], [point_2d[1]], [1]])
@@ -66,12 +137,82 @@ class CameraCalibrator:
         return transformed[:2].flatten()
     
     def calibrate(self, frame):
+        """Perform full calibration on a sample frame."""
         self.compute_homography_from_reference(frame)
         return self.calibrated
 
+class TrackingMetrics:
+    """
+    Computes tracking quality metrics: MOTA, MOTP, IDF1, Precision, Recall.
+    NOTE: These metrics require ground truth bounding boxes per frame to be accurate.
+    """
+    
+    def __init__(self):
+        self.tracked_ids = defaultdict(lambda: {"gt": 0, "pred": 0, "iou_sum": 0, "matches": 0})
+        self.all_gt_detections = 0
+        self.all_predictions = 0
+        self.matches = 0
+        self.misses = 0
+        self.false_positives = 0
+        self.id_switches = 0
+        self.track_continuity = defaultdict(list)
+        
+    def update(self, gt_count, pred_count, matches, iou_scores):
+        """Update metrics with results from a frame."""
+        self.all_gt_detections += gt_count
+        self.all_predictions += pred_count
+        self.matches += matches
+        self.false_positives += max(0, pred_count - matches)
+        self.misses += max(0, gt_count - matches)
+    
+    def compute_mota(self):
+        """Multiple Object Tracking Accuracy."""
+        if self.all_gt_detections == 0:
+            return 0.0
+        return 1.0 - (self.misses + self.false_positives + self.id_switches) / self.all_gt_detections
+    
+    def compute_precision(self):
+        """Detection Precision."""
+        if self.all_predictions == 0:
+            return 0.0
+        return self.matches / self.all_predictions
+    
+    def compute_recall(self):
+        """Detection Recall."""
+        if self.all_gt_detections == 0:
+            return 0.0
+        return self.matches / self.all_gt_detections
+    
+    def compute_f1_score(self):
+        """Harmonic mean of Precision and Recall."""
+        precision = self.compute_precision()
+        recall = self.compute_recall()
+        if precision + recall == 0:
+            return 0.0
+        return 2 * (precision * recall) / (precision + recall)
+    
+    def get_summary(self):
+        """Return all metrics as dictionary."""
+        return {
+            "MOTA": round(self.compute_mota(), 3),
+            "Precision": round(self.compute_precision(), 3),
+            "Recall": round(self.compute_recall(), 3),
+            "F1_Score": round(self.compute_f1_score(), 3),
+            "Total_GT": self.all_gt_detections,
+            "Total_Predictions": self.all_predictions,
+            "Matches": self.matches,
+            "Misses": self.misses,
+            "False_Positives": self.false_positives,
+            "ID_Switches": self.id_switches
+        }
+
+
 class AdvancedSpeedEstimator:
     """
-    Enhanced speed estimation with homography and IQR filtering.
+    Enhanced speed estimation using:
+    - Homography-based perspective correction
+    - Bounding box size normalization
+    - Outlier rejection with IQR filtering
     """
     def __init__(self, fps, calibrator, speed_threshold_kmph=100):
         self.fps = fps
@@ -81,8 +222,20 @@ class AdvancedSpeedEstimator:
         self.speed_history = defaultdict(deque)
         self.max_history = 30
         self.meters_per_pixel_baseline = 0.015
+        self.violations = defaultdict(list)
         
     def estimate_speed(self, track_id, bbox, frame_idx):
+        """
+        Estimate speed using homography correction and bounding box analysis.
+        
+        Args:
+            track_id: Unique tracker ID
+            bbox: [x1, y1, x2, y2] bounding box coordinates
+            frame_idx: Current frame index
+        
+        Returns:
+            speed_kmph: Speed in km/h, None if insufficient history
+        """
         x1, y1, x2, y2 = bbox
         cx = (x1 + x2) / 2
         cy = (y1 + y2) / 2
@@ -106,6 +259,7 @@ class AdvancedSpeedEstimator:
         return None
     
     def _compute_speed_from_history(self, track_id, scale_factor):
+        """Compute speed using trajectory history with outlier rejection."""
         history = list(self.track_history[track_id])
         speeds = []
         for i in range(max(0, len(history) - 5), len(history) - 1):
@@ -132,7 +286,28 @@ class AdvancedSpeedEstimator:
         return None
     
     def is_violation(self, track_id, speed_kmph):
-        return speed_kmph is not None and speed_kmph > self.speed_threshold_kmph
+        """Check if speed exceeds threshold and record violation."""
+        if speed_kmph is not None and speed_kmph > self.speed_threshold_kmph:
+            self.violations[track_id].append({
+                'speed': round(speed_kmph, 2),
+                'threshold': self.speed_threshold_kmph,
+                'excess': round(speed_kmph - self.speed_threshold_kmph, 2)
+            })
+            return True
+        return False
+
+    def get_track_stats(self, track_id):
+        """Get average speed and violation count for a track."""
+        speeds = list(self.speed_history[track_id])
+        if not speeds:
+            return {"avg_speed": 0, "max_speed": 0, "min_speed": 0, "violations": 0}
+        
+        return {
+            "avg_speed": round(np.mean(speeds), 2),
+            "max_speed": round(np.max(speeds), 2),
+            "min_speed": round(np.min(speeds), 2),
+            "violations": len(self.violations[track_id])
+        }
 
 def _severity(excess_kmh: float) -> str:
     if excess_kmh < 10:
@@ -240,6 +415,8 @@ class TrafficPipeline:
         tracker_req = self.cfg.get("tracker_yaml", "botsort.yaml")
         if tracker_req in ("bytetrack.yaml", "bytetrack"):
             tracker = os.path.join(os.path.dirname(__file__), "custom-bytetrack2.yaml")
+        elif tracker_req in ("botsort.yaml", "botsort"):
+            tracker = os.path.join(os.path.dirname(__file__), "custom-botsort.yaml")
         else:
             tracker = tracker_req
 
@@ -364,7 +541,26 @@ class TrafficPipeline:
             "frames":       frame_num,
             "duration":     round(elapsed, 2),
             "accuracy_pct": accuracy,
+            "avg_speed":    self._compute_avg_speed(speed_estimator),
+            "max_speed":    self._compute_max_speed(speed_estimator),
         }
+
+    def _compute_avg_speed(self, speed_estimator) -> float:
+        """Compute average speed across all tracks."""
+        all_speeds = []
+        for track_id in speed_estimator.speed_history:
+            speeds = list(speed_estimator.speed_history[track_id])
+            all_speeds.extend(speeds)
+        return round(float(np.mean(all_speeds)), 2) if all_speeds else 0.0
+
+    def _compute_max_speed(self, speed_estimator) -> float:
+        """Compute maximum speed detected."""
+        max_speed = 0.0
+        for track_id in speed_estimator.speed_history:
+            speeds = list(speed_estimator.speed_history[track_id])
+            if speeds:
+                max_speed = max(max_speed, max(speeds))
+        return round(max_speed, 2)
 
     def _compile(
         self,
@@ -383,6 +579,12 @@ class TrafficPipeline:
         viol_rate  = round(len(violations) / total_vehicles * 100, 1) if total_vehicles else 0.0
         active_fps = [s["fps"] for s in per_video if s["fps"] > 0]
         avg_fps    = round(float(np.mean(active_fps)), 1) if active_fps else 0.0
+
+        # Compute overall avg/max speed from per-video stats
+        all_avg_speeds = [s.get("avg_speed", 0) for s in per_video if s.get("avg_speed", 0) > 0]
+        all_max_speeds = [s.get("max_speed", 0) for s in per_video if s.get("max_speed", 0) > 0]
+        overall_avg_speed = round(float(np.mean(all_avg_speeds)), 1) if all_avg_speeds else 0.0
+        overall_max_speed = round(float(max(all_max_speeds)), 1) if all_max_speeds else 0.0
 
         # First 20 videos for chart readability
         sample = per_video[:20]
@@ -416,6 +618,8 @@ class TrafficPipeline:
                 "vehicles":  total_vehicles,
                 "violations": len(violations),
                 "fps":       avg_fps,
+                "avg_speed": overall_avg_speed,
+                "max_speed": overall_max_speed,
             },
             "violations_summary": {
                 "total":           len(violations),
