@@ -918,8 +918,8 @@ function initDemoSimulation() {
 // ============================================================
 
 const API_BASE = 'http://localhost:5000';
-// Direct ZIP download of the entire repo (user extracts downloadable-backend folder)
-const BACKEND_ZIP_URL = 'https://github.com/JoydeepPaul/traffic-vision-dashboard/archive/refs/heads/main.zip';
+// ZIP file hosted on Netlify (in archive folder)
+const BACKEND_ZIP_URL = 'trafficvision-backend.zip';
 let _sseSource = null;
 let _isRunning  = false;
 let _gpuInfo = null;
@@ -1169,11 +1169,11 @@ async function downloadBackend() {
                         <polyline points="7 10 12 15 17 10"></polyline>
                         <line x1="12" y1="15" x2="12" y2="3"></line>
                     </svg>
-                    Download ZIP (~5MB)
+                    Download ZIP
                 </a>
                 
                 <p class="download-note" style="margin-top: 12px;">
-                    <strong>After downloading:</strong> Extract the ZIP → Open the <code>downloadable-backend</code> folder → Run <code>start.bat</code><br><br>
+                    <strong>After downloading:</strong> Extract the ZIP → Run <code>start.bat</code> (Windows) or <code>./start.sh</code> (Mac/Linux)<br><br>
                     <strong>Requirements:</strong> Python 3.10+, ~2GB disk space<br>
                     <strong>GPU Support:</strong> NVIDIA (CUDA), AMD (ROCm), Apple Silicon (MPS)
                 </p>
