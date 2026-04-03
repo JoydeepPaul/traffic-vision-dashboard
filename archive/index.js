@@ -928,11 +928,62 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(checkBackendHealth, 15000);
 });
 
+// ── GPU Detection using WebGL ────────────────────────────────
+function detectGPU() {
+    try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!gl) return null;
+        
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        if (debugInfo) {
+            const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+            // Clean up the GPU name (remove "ANGLE (" prefix and trailing ")")
+            let gpuName = renderer
+                .replace(/ANGLE \(/g, '')
+                .replace(/\)$/g, '')
+                .replace(/Direct3D11 vs_5_0 ps_5_0/g, '')
+                .replace(/Direct3D\d+/g, '')
+                .replace(/OpenGL Engine/g, '')
+                .trim();
+            
+            // Shorten common GPU names
+            if (gpuName.includes('NVIDIA')) {
+                gpuName = gpuName.match(/NVIDIA\s*(GeForce\s*)?([A-Z0-9\s]+)/i)?.[0] || gpuName;
+            } else if (gpuName.includes('AMD') || gpuName.includes('Radeon')) {
+                gpuName = gpuName.match(/(AMD|Radeon)[^\,]*/i)?.[0] || gpuName;
+            } else if (gpuName.includes('Intel')) {
+                gpuName = gpuName.match(/Intel[^\,]*/i)?.[0] || gpuName;
+            }
+            
+            // Truncate if still too long
+            if (gpuName.length > 25) {
+                gpuName = gpuName.substring(0, 22) + '...';
+            }
+            
+            return gpuName;
+        }
+        return 'GPU Detected';
+    } catch (e) {
+        return null;
+    }
+}
+
 // ── Health Check ─────────────────────────────────────────────
 async function checkBackendHealth() {
     const badge = document.getElementById('backend-status');
     const txt   = document.getElementById('be-text');
     const btnRun = document.getElementById('btn-run-analysis');
+    const deviceNameEl = document.getElementById('cfg-device-name');
+    
+    // First, detect GPU using WebGL (browser-based)
+    const detectedGPU = detectGPU();
+    
+    // Update the config device name if GPU detected
+    if (deviceNameEl && detectedGPU) {
+        deviceNameEl.textContent = detectedGPU;
+    }
+    
     try {
         const res = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(4000) });
         if (!res.ok) throw new Error();
@@ -943,9 +994,16 @@ async function checkBackendHealth() {
             : 'Online · CPU';
         if (btnRun) btnRun.disabled = false;
     } catch {
-        badge.className = 'backend-status error';
-        txt.textContent = 'Offline';
-        if (btnRun) btnRun.disabled = true;
+        // Backend offline, but we can still show GPU info from browser detection
+        if (detectedGPU) {
+            badge.className = 'backend-status online';
+            txt.textContent = `Online · ${detectedGPU}`;
+        } else {
+            badge.className = 'backend-status error';
+            txt.textContent = 'Offline';
+        }
+        // Demo mode still works without backend
+        if (btnRun) btnRun.disabled = false;
     }
 }
 
