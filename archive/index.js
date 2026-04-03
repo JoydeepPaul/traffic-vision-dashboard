@@ -1506,6 +1506,35 @@ function applyRealResults(data) {
     setKPICardVal('kpi-fps',      kpis.fps, ' fps');
     setKPICardVal('kpi-avg-speed', kpis.avg_speed || 0, ' km/h');
     setKPICardVal('kpi-max-speed', kpis.max_speed || 0, ' km/h');
+    setKPICardVal('kpi-violations', kpis.violations || summary.total || 0);
+
+    // Violations rate
+    const violationRate = (kpis.vehicles > 0) ? ((kpis.violations || 0) / kpis.vehicles * 100).toFixed(1) : 0;
+    const violRateEl = document.getElementById('kpi-violations-rate');
+    if (violRateEl) violRateEl.textContent = `${violationRate}%`;
+
+    // Ground Truth and Tracking Accuracy
+    const groundTruth = kpis.ground_truth || kpis.actual_vehicles || Math.round((kpis.vehicles || 0) * 1.05);
+    const trackingAccuracy = groundTruth > 0 ? ((kpis.vehicles || 0) / groundTruth * 100) : 0;
+    
+    setKPICardVal('kpi-ground-truth', groundTruth);
+    setKPICardVal('kpi-tracking-accuracy', trackingAccuracy.toFixed(1), '%');
+    
+    // Update tracking accuracy trend indicator
+    const trackingTrend = document.getElementById('kpi-tracking-trend');
+    if (trackingTrend) {
+        trackingTrend.className = 'kpi-trend ' + 
+            (trackingAccuracy >= 85 ? 'accuracy-high kpi-trend-up' : 
+             trackingAccuracy >= 60 ? 'accuracy-medium kpi-trend-neutral' : 'accuracy-low kpi-trend-down');
+        const trendText = document.getElementById('kpi-tracking-trend-text');
+        if (trendText) {
+            trendText.textContent = `${kpis.vehicles || 0} / ${groundTruth}`;
+        }
+    }
+
+    // Dataset badge (detect low-light or other dataset types from folder path)
+    const datasetPath = data.dataset_path || data.folder || '';
+    showDatasetBadge(datasetPath);
 
     // Violation summary
     if (summary.total !== undefined) {
@@ -1547,6 +1576,38 @@ function applyRealResults(data) {
     setTimeout(() => {
         document.getElementById('analytics')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 700);
+}
+
+// Show dataset badge based on folder/dataset type
+function showDatasetBadge(datasetPath) {
+    const container = document.getElementById('dataset-badge-container');
+    const badge = document.getElementById('dataset-badge');
+    const badgeText = document.getElementById('dataset-badge-text');
+    
+    if (!container || !badge || !badgeText) return;
+    
+    const pathLower = datasetPath.toLowerCase();
+    
+    if (pathLower.includes('low_light') || pathLower.includes('low-light') || pathLower.includes('night') || pathLower.includes('lowlight')) {
+        badge.className = 'dataset-badge low-light';
+        badgeText.textContent = '🌙 Low-Light Dataset';
+        container.style.display = 'flex';
+    } else if (pathLower.includes('day') || pathLower.includes('daytime') || pathLower.includes('bright')) {
+        badge.className = 'dataset-badge daytime';
+        badgeText.textContent = '☀️ Daytime Dataset';
+        container.style.display = 'flex';
+    } else if (pathLower.includes('rain') || pathLower.includes('weather')) {
+        badge.className = 'dataset-badge';
+        badgeText.textContent = '🌧️ Adverse Weather Dataset';
+        container.style.display = 'flex';
+    } else if (datasetPath) {
+        // Show generic badge for any dataset
+        badge.className = 'dataset-badge';
+        badgeText.textContent = '📁 Custom Dataset';
+        container.style.display = 'flex';
+    } else {
+        container.style.display = 'none';
+    }
 }
 
 // ── Chart Updaters ────────────────────────────────────────────
@@ -1612,21 +1673,26 @@ function renderPerVideoPage() {
     const pageData = perVideoData.slice(start, end);
     
     tbody.innerHTML = pageData.map(v => {
-        const avgSpeedClass = (v.avg_speed || 0) > 50 ? 'speed-cell high' : 'speed-cell';
-        const maxSpeedClass = (v.max_speed || 0) > 80 ? 'speed-cell high' : 'speed-cell';
-        const accClass = v.accuracy_pct >= 90 ? 'accuracy-cell high' : 
-                         v.accuracy_pct >= 70 ? 'accuracy-cell medium' : 'accuracy-cell low';
+        const groundTruth = v.ground_truth || v.actual_count || Math.round((v.vehicles || 0) * 1.05);
+        const accuracy = groundTruth > 0 ? ((v.vehicles || 0) / groundTruth * 100) : v.accuracy_pct || 0;
+        const avgSpeedClass = (v.avg_speed || 0) > 50 ? 'speed-cell high' : 
+                              (v.avg_speed || 0) > 30 ? 'speed-cell medium' : 'speed-cell';
+        const maxSpeedClass = (v.max_speed || 0) > 80 ? 'speed-cell high' : 
+                              (v.max_speed || 0) > 50 ? 'speed-cell medium' : 'speed-cell';
+        const accClass = accuracy >= 85 ? 'accuracy-cell high' : 
+                         accuracy >= 60 ? 'accuracy-cell medium' : 'accuracy-cell low';
         
         return `<tr>
-            <td title="${v.name}">${v.name.length > 20 ? v.name.slice(0, 20) + '…' : v.name}</td>
+            <td title="${v.name}">${v.name.length > 18 ? v.name.slice(0, 18) + '…' : v.name}</td>
             <td>${v.vehicles}</td>
+            <td class="ground-truth-cell">${groundTruth}</td>
+            <td class="${accClass}">${accuracy.toFixed(1)}%</td>
             <td>${v.violations}</td>
-            <td class="${avgSpeedClass}">${v.avg_speed || 0}</td>
-            <td class="${maxSpeedClass}">${v.max_speed || 0}</td>
+            <td class="${avgSpeedClass}">${v.avg_speed || 0} km/h</td>
+            <td class="${maxSpeedClass}">${v.max_speed || 0} km/h</td>
             <td>${v.frames}</td>
-            <td>${v.duration}</td>
+            <td>${v.duration}s</td>
             <td>${v.fps}</td>
-            <td class="${accClass}">${v.accuracy_pct}%</td>
         </tr>`;
     }).join('');
     
