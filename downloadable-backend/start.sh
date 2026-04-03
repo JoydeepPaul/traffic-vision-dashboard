@@ -38,36 +38,69 @@ fi
 source venv/bin/activate
 echo "[OK] Virtual environment ready"
 
+# Check for NVIDIA GPU first
+echo ""
+echo "[3/6] Checking for NVIDIA GPU..."
+HAS_NVIDIA=0
+if command -v nvidia-smi &> /dev/null; then
+    nvidia-smi &> /dev/null
+    if [ $? -eq 0 ]; then
+        echo "[OK] NVIDIA GPU detected! Will install CUDA-enabled PyTorch."
+        HAS_NVIDIA=1
+    fi
+fi
+
+if [ $HAS_NVIDIA -eq 0 ]; then
+    echo "[INFO] No NVIDIA GPU detected. Will use CPU mode."
+fi
+
 # Install dependencies
 echo ""
-echo "[3/5] Installing dependencies (this may take several minutes on first run)..."
+echo "[4/6] Installing dependencies (this may take several minutes on first run)..."
 echo "     Please wait..."
 echo ""
 
 # Upgrade pip
 python -m pip install --upgrade pip > /dev/null 2>&1
 
-# Install dependencies
+# Install PyTorch with CUDA support if NVIDIA GPU is available
+if [ $HAS_NVIDIA -eq 1 ]; then
+    echo "Installing PyTorch with CUDA support..."
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+    if [ $? -ne 0 ]; then
+        echo "[WARNING] CUDA 12.1 install failed, trying CUDA 11.8..."
+        pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+        if [ $? -ne 0 ]; then
+            echo "[WARNING] CUDA install failed, falling back to CPU..."
+            pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+        fi
+    fi
+else
+    echo "Installing PyTorch (CPU version)..."
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+fi
+
+# Install other dependencies
+echo "Installing other dependencies..."
 pip install -r requirements.txt
 if [ $? -ne 0 ]; then
     echo ""
     echo "[WARNING] Some packages failed. Trying alternative install..."
     pip install flask flask-cors ultralytics opencv-python numpy pandas scipy scikit-learn fastapi uvicorn pydantic
-    pip install torch --index-url https://download.pytorch.org/whl/cpu
 fi
 echo ""
 echo "[OK] Dependencies installed"
 
 # GPU Detection
 echo ""
-echo "[4/5] Detecting GPU..."
+echo "[5/6] Verifying GPU Setup..."
 echo ""
 
-python -c "import torch; print('[GPU] CUDA Available:', torch.cuda.is_available()); print('[GPU] Device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')" 2>/dev/null || echo "[INFO] GPU detection skipped"
+python -c "import torch; cuda_ok = torch.cuda.is_available(); print('[GPU] CUDA Available:', cuda_ok); print('[GPU] Device:', torch.cuda.get_device_name(0) if cuda_ok else 'CPU (No CUDA)'); print('[GPU] CUDA Version:', torch.version.cuda if cuda_ok else 'N/A')" 2>/dev/null || echo "[INFO] GPU verification skipped"
 
 # Start the backend server
 echo ""
-echo "[5/5] Starting TrafficVision AI Backend Server..."
+echo "[6/6] Starting TrafficVision AI Backend Server..."
 echo ""
 echo "============================================================"
 echo ""
