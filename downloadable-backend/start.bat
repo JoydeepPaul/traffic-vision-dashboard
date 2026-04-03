@@ -1,8 +1,8 @@
 @echo off
 REM ============================================================
 REM  TrafficVision AI — Auto-Setup & Start Script (Windows)
-REM  Automatically installs dependencies, detects/enables GPU,
-REM  downloads YOLO model, and starts the FastAPI backend server.
+REM  Automatically installs dependencies, detects GPU,
+REM  and starts the FastAPI backend server.
 REM ============================================================
 SETLOCAL EnableDelayedExpansion
 
@@ -15,12 +15,14 @@ echo ============================================================
 echo.
 
 REM Check for Python
-echo [1/6] Checking for Python installation...
-python --version >nul 2>&1
+echo [1/5] Checking for Python installation...
+where python >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Python is not installed or not in PATH.
+    echo.
     echo Please install Python 3.10+ from https://www.python.org/downloads/
     echo Make sure to check "Add Python to PATH" during installation.
+    echo.
     pause
     exit /b 1
 )
@@ -30,8 +32,8 @@ echo [OK] Python %PYVER% found
 
 REM Create virtual environment if it doesn't exist
 echo.
-echo [2/6] Setting up virtual environment...
-if not exist "venv" (
+echo [2/5] Setting up virtual environment...
+if not exist "venv\Scripts\activate.bat" (
     echo Creating virtual environment...
     python -m venv venv
     if %ERRORLEVEL% NEQ 0 (
@@ -45,128 +47,58 @@ echo [OK] Virtual environment ready
 REM Activate virtual environment
 call venv\Scripts\activate.bat
 
-REM Install dependencies
+REM Install/upgrade pip and dependencies
 echo.
-echo [3/6] Installing dependencies (this may take a few minutes)...
-pip install --quiet --upgrade pip
-pip install --quiet -r requirements.txt
+echo [3/5] Installing dependencies (this may take several minutes on first run)...
+echo      Please wait...
+echo.
+
+REM Upgrade pip first (suppress errors)
+python -m pip install --upgrade pip >nul 2>&1
+
+REM Install dependencies
+pip install -r requirements.txt
 if %ERRORLEVEL% NEQ 0 (
-    echo [WARNING] Some packages may have failed. Attempting individual installs...
-    pip install flask flask-cors ultralytics opencv-python numpy pandas torch scipy scikit-learn fastapi uvicorn pydantic
+    echo.
+    echo [WARNING] Some packages failed. Trying alternative install...
+    pip install flask flask-cors ultralytics opencv-python numpy pandas scipy scikit-learn fastapi uvicorn pydantic
+    pip install torch --index-url https://download.pytorch.org/whl/cpu
 )
+echo.
 echo [OK] Dependencies installed
 
-REM Download YOLO model if not present
+REM GPU Detection
 echo.
-echo [4/6] Checking YOLO model...
-if not exist "yolo12m.pt" (
-    echo Downloading YOLO model (this may take a moment)...
-    python -c "from ultralytics import YOLO; model = YOLO('yolo11m.pt'); print('Model downloaded successfully')"
-    if %ERRORLEVEL% NEQ 0 (
-        echo [WARNING] Could not download default model. The system will download it on first run.
-    ) else (
-        echo [OK] YOLO model ready
-    )
-) else (
-    echo [OK] YOLO model already present
+echo [4/5] Detecting GPU...
+echo.
+
+python -c "import torch; print('[GPU] CUDA Available:', torch.cuda.is_available()); print('[GPU] Device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')" 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo [INFO] GPU detection skipped - PyTorch loading...
 )
-
-REM GPU Detection and Enablement
-echo.
-echo [5/6] Detecting and configuring GPU...
-echo.
-
-REM Create a Python script for GPU detection and configuration
-python -c "
-import sys
-import subprocess
-import os
-
-def detect_and_enable_gpu():
-    gpu_info = {
-        'available': False,
-        'name': 'CPU',
-        'vram': 'N/A',
-        'cuda_version': 'N/A',
-        'driver_version': 'N/A',
-        'compute_capability': 'N/A'
-    }
-    
-    try:
-        import torch
-        
-        if torch.cuda.is_available():
-            gpu_info['available'] = True
-            gpu_info['name'] = torch.cuda.get_device_name(0)
-            
-            # Get VRAM
-            total_memory = torch.cuda.get_device_properties(0).total_memory
-            gpu_info['vram'] = f'{total_memory / (1024**3):.1f} GB'
-            
-            # Get CUDA version
-            gpu_info['cuda_version'] = torch.version.cuda or 'N/A'
-            
-            # Get compute capability
-            props = torch.cuda.get_device_properties(0)
-            gpu_info['compute_capability'] = f'{props.major}.{props.minor}'
-            
-            print(f'[GPU DETECTED]')
-            print(f'  Name: {gpu_info[\"name\"]}')
-            print(f'  VRAM: {gpu_info[\"vram\"]}')
-            print(f'  CUDA: {gpu_info[\"cuda_version\"]}')
-            print(f'  Compute Capability: {gpu_info[\"compute_capability\"]}')
-            print('[OK] NVIDIA GPU is active and ready!')
-        else:
-            print('[INFO] No CUDA-capable GPU detected.')
-            print('[INFO] Attempting to enable NVIDIA GPU...')
-            
-            # Try to enable NVIDIA GPU via Windows commands
-            try:
-                # Check if NVIDIA driver exists
-                result = subprocess.run(['nvidia-smi'], capture_output=True, text=True, timeout=10)
-                if result.returncode == 0:
-                    print('[INFO] NVIDIA driver found. GPU may be disabled in PyTorch.')
-                    print('[INFO] Try reinstalling PyTorch with CUDA support:')
-                    print('       pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121')
-                else:
-                    print('[INFO] NVIDIA driver not found. Install from:')
-                    print('       https://www.nvidia.com/drivers')
-            except Exception as e:
-                print(f'[INFO] Could not check NVIDIA driver: {e}')
-                print('[INFO] Will proceed with CPU processing.')
-            
-            print('[INFO] Backend will use CPU for processing.')
-            
-    except ImportError:
-        print('[WARNING] PyTorch not installed yet. GPU check will be done after dependency installation.')
-    except Exception as e:
-        print(f'[WARNING] GPU detection error: {e}')
-        print('[INFO] Backend will use CPU for processing.')
-    
-    return gpu_info
-
-if __name__ == '__main__':
-    detect_and_enable_gpu()
-"
 
 REM Start the backend server
 echo.
-echo [6/6] Starting TrafficVision AI Backend Server...
+echo [5/5] Starting TrafficVision AI Backend Server...
 echo.
 echo ============================================================
-echo   Backend server starting on http://localhost:5000
-echo   
-echo   IMPORTANT: Keep this window open while using the website!
-echo   
-echo   Once you see "Uvicorn running on http://0.0.0.0:5000"
-echo   go to https://trafficvision-ai-joydeep.netlify.app/
-echo   The website will automatically detect your local backend.
-echo   
+echo.
+echo   Server URL: http://localhost:5000
+echo.
+echo   KEEP THIS WINDOW OPEN while using the website!
+echo.
+echo   Website: https://trafficvision-ai-joydeep.netlify.app/
+echo.
 echo   Press Ctrl+C to stop the server.
+echo.
 echo ============================================================
+echo.
+echo Starting server...
 echo.
 
 python app_fastapi.py
 
+echo.
+echo Server stopped.
 ENDLOCAL
 pause
