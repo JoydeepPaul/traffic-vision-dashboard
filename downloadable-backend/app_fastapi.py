@@ -1,6 +1,7 @@
 """
 app_fastapi.py — TrafficVision AI FastAPI Backend
 Exposes REST + SSE endpoints to control the detection pipeline.
+Enhanced with GPU status endpoint for website integration.
 """
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ import threading
 import traceback
 import re
 import os
+import subprocess
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
@@ -18,9 +20,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-app = FastAPI(title="TrafficVision AI", version="2.0.0")
+app = FastAPI(title="TrafficVision AI", version="2.1.0")
 
-# CORS
+# CORS - Allow all origins for local development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -62,15 +64,11 @@ def _clear_queue() -> None:
             break
 
 
-# ─── Helper Functions ─────────────────────────────────────────────────────────
-
 def get_gpu_info() -> dict:
     """
     Comprehensive GPU detection and status retrieval.
     Supports NVIDIA (CUDA), AMD (ROCm), and Apple Silicon (MPS).
     """
-    import subprocess
-    
     gpu_info = {
         "available": False,
         "enabled": False,
@@ -150,8 +148,19 @@ def get_gpu_info() -> dict:
             gpu_info["status"] = "online"
             
         else:
-            # No GPU available
-            gpu_info["status"] = "not_found"
+            # No GPU available, try to detect if one exists but is disabled
+            gpu_info["status"] = "disabled"
+            try:
+                result = subprocess.run(
+                    ['nvidia-smi', '--query-gpu=name', '--format=csv,noheader'],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    gpu_info["available"] = True
+                    gpu_info["name"] = result.stdout.strip()
+                    gpu_info["status"] = "driver_issue"
+            except Exception:
+                gpu_info["status"] = "not_found"
                 
     except ImportError:
         gpu_info["status"] = "pytorch_not_installed"
@@ -369,8 +378,24 @@ async def status():
 
 if __name__ == "__main__":
     import uvicorn
+    
+    # Get GPU info at startup
+    gpu = get_gpu_info()
+    
     print("=" * 60)
     print("  TrafficVision AI — FastAPI Backend Server")
-    print("  Listening on http://localhost:5000")
     print("=" * 60)
+    print(f"  GPU Status: {gpu['status'].upper()}")
+    if gpu['available']:
+        print(f"  GPU Name:   {gpu['name']}")
+        print(f"  VRAM:       {gpu['vram_total']}")
+        if gpu['cuda_version'] != 'N/A':
+            print(f"  CUDA:       {gpu['cuda_version']}")
+    else:
+        print("  Running on: CPU")
+    print("=" * 60)
+    print("  Listening on http://localhost:5000")
+    print("  Press Ctrl+C to stop")
+    print("=" * 60)
+    
     uvicorn.run(app, host="0.0.0.0", port=5000)

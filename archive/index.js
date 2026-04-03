@@ -918,14 +918,19 @@ function initDemoSimulation() {
 // ============================================================
 
 const API_BASE = 'http://localhost:5000';
+const BACKEND_DOWNLOAD_URL = 'https://github.com/joydeep-paul/traffic-vision-dashboard/releases/download/v1.0/trafficvision-backend.zip';
 let _sseSource = null;
 let _isRunning  = false;
+let _gpuInfo = null;
 
 // ── Boot ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     initLaunchPanel();
+    initDownloadButton();
+    initGPUStatus();
     checkBackendHealth();
     setInterval(checkBackendHealth, 15000);
+    setInterval(checkGPUStatus, 30000);
 });
 
 // ── Health Check ─────────────────────────────────────────────
@@ -942,10 +947,401 @@ async function checkBackendHealth() {
             ? `Online · ${data.device.split(' ').slice(0,2).join(' ')}`
             : 'Online · CPU';
         if (btnRun) btnRun.disabled = false;
+        
+        // Also check GPU status when backend is online
+        checkGPUStatus();
     } catch {
         badge.className = 'backend-status error';
         txt.textContent = 'Offline';
         if (btnRun) btnRun.disabled = true;
+        updateGPUStatusUI(null);
+    }
+}
+
+// ── GPU Status ───────────────────────────────────────────────
+function initGPUStatus() {
+    const gpuStatus = document.getElementById('gpu-status');
+    if (gpuStatus) {
+        // Add tooltip container
+        const tooltip = document.createElement('div');
+        tooltip.className = 'gpu-tooltip';
+        tooltip.id = 'gpu-tooltip';
+        gpuStatus.style.position = 'relative';
+        gpuStatus.appendChild(tooltip);
+    }
+}
+
+async function checkGPUStatus() {
+    try {
+        const res = await fetch(`${API_BASE}/api/gpu-status`, { signal: AbortSignal.timeout(4000) });
+        if (!res.ok) throw new Error();
+        const gpuData = await res.json();
+        _gpuInfo = gpuData;
+        updateGPUStatusUI(gpuData);
+    } catch {
+        updateGPUStatusUI(null);
+    }
+}
+
+function updateGPUStatusUI(gpuData) {
+    const gpuStatus = document.getElementById('gpu-status');
+    const gpuText = document.getElementById('gpu-text');
+    const gpuTooltip = document.getElementById('gpu-tooltip');
+    
+    if (!gpuStatus || !gpuText) return;
+    
+    if (!gpuData) {
+        gpuStatus.className = 'gpu-status offline';
+        gpuText.textContent = 'GPU: --';
+        if (gpuTooltip) gpuTooltip.innerHTML = '<div class="gpu-tooltip-row"><span class="gpu-tooltip-label">Backend offline</span></div>';
+        return;
+    }
+    
+    // Determine GPU type and update styling
+    let gpuClass = 'offline';
+    let displayName = 'CPU';
+    
+    if (gpuData.available && gpuData.enabled) {
+        if (gpuData.type === 'nvidia') {
+            gpuClass = 'nvidia';
+            displayName = gpuData.name.split(' ').slice(0, 3).join(' ');
+        } else if (gpuData.type === 'amd') {
+            gpuClass = 'amd';
+            displayName = 'AMD GPU';
+        } else if (gpuData.type === 'apple') {
+            gpuClass = 'apple';
+            displayName = 'Apple Silicon';
+        } else {
+            gpuClass = 'online';
+            displayName = gpuData.name;
+        }
+    }
+    
+    gpuStatus.className = `gpu-status ${gpuClass}`;
+    gpuText.textContent = `GPU: ${displayName.length > 15 ? displayName.substring(0, 15) + '...' : displayName}`;
+    
+    // Update tooltip with detailed info
+    if (gpuTooltip) {
+        let tooltipHTML = '';
+        
+        if (gpuData.available && gpuData.enabled) {
+            tooltipHTML = `
+                <div class="gpu-tooltip-row">
+                    <span class="gpu-tooltip-label">Name</span>
+                    <span class="gpu-tooltip-value">${gpuData.name}</span>
+                </div>
+                <div class="gpu-tooltip-row">
+                    <span class="gpu-tooltip-label">Status</span>
+                    <span class="gpu-tooltip-value" style="color: var(--accent-green);">● Online</span>
+                </div>
+                <div class="gpu-tooltip-row">
+                    <span class="gpu-tooltip-label">VRAM</span>
+                    <span class="gpu-tooltip-value">${gpuData.vram_total}</span>
+                </div>
+                ${gpuData.cuda_version !== 'N/A' ? `
+                <div class="gpu-tooltip-row">
+                    <span class="gpu-tooltip-label">CUDA</span>
+                    <span class="gpu-tooltip-value">${gpuData.cuda_version}</span>
+                </div>` : ''}
+                ${gpuData.temperature !== 'N/A' ? `
+                <div class="gpu-tooltip-row">
+                    <span class="gpu-tooltip-label">Temp</span>
+                    <span class="gpu-tooltip-value">${gpuData.temperature}</span>
+                </div>` : ''}
+                ${gpuData.utilization !== 'N/A' ? `
+                <div class="gpu-tooltip-row">
+                    <span class="gpu-tooltip-label">Usage</span>
+                    <span class="gpu-tooltip-value">${gpuData.utilization}</span>
+                </div>` : ''}
+            `;
+        } else {
+            tooltipHTML = `
+                <div class="gpu-tooltip-row">
+                    <span class="gpu-tooltip-label">Status</span>
+                    <span class="gpu-tooltip-value" style="color: var(--text-muted);">● ${gpuData.status || 'Not detected'}</span>
+                </div>
+                <div class="gpu-tooltip-row">
+                    <span class="gpu-tooltip-label">Processing</span>
+                    <span class="gpu-tooltip-value">CPU Mode</span>
+                </div>
+            `;
+        }
+        
+        gpuTooltip.innerHTML = tooltipHTML;
+    }
+}
+
+// ── Download Backend ─────────────────────────────────────────
+function initDownloadButton() {
+    const btnDownload = document.getElementById('btn-download-backend');
+    if (btnDownload) {
+        btnDownload.addEventListener('click', downloadBackend);
+    }
+}
+
+async function downloadBackend() {
+    const btn = document.getElementById('btn-download-backend');
+    if (!btn || btn.classList.contains('downloading')) return;
+    
+    // Show downloading state
+    const originalContent = btn.innerHTML;
+    btn.classList.add('downloading');
+    btn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        Downloading...
+    `;
+    
+    try {
+        // Create a download link
+        // Note: In production, this would point to a hosted ZIP file
+        // For now, we'll show instructions
+        
+        const downloadModal = document.createElement('div');
+        downloadModal.id = 'download-modal';
+        downloadModal.innerHTML = `
+            <div class="download-modal-overlay" onclick="closeDownloadModal()"></div>
+            <div class="download-modal-content">
+                <button class="download-modal-close" onclick="closeDownloadModal()">&times;</button>
+                <h3>📦 Download Local Backend</h3>
+                <p>To run TrafficVision AI with full functionality, download and set up the local backend:</p>
+                
+                <div class="download-steps">
+                    <div class="download-step">
+                        <span class="step-num">1</span>
+                        <div>
+                            <strong>Download the backend files</strong>
+                            <p>Click the button below to download the ZIP file (~500MB including YOLO model)</p>
+                        </div>
+                    </div>
+                    <div class="download-step">
+                        <span class="step-num">2</span>
+                        <div>
+                            <strong>Extract to any folder</strong>
+                            <p>Unzip the downloaded file to a location of your choice</p>
+                        </div>
+                    </div>
+                    <div class="download-step">
+                        <span class="step-num">3</span>
+                        <div>
+                            <strong>Run the setup script</strong>
+                            <p><strong>Windows:</strong> Double-click <code>start.bat</code></p>
+                            <p><strong>Mac/Linux:</strong> Run <code>./start.sh</code> in terminal</p>
+                        </div>
+                    </div>
+                    <div class="download-step">
+                        <span class="step-num">4</span>
+                        <div>
+                            <strong>Wait for auto-setup</strong>
+                            <p>The script will automatically install dependencies, detect your GPU, and start the server</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="download-features">
+                    <div class="download-feature">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Auto-installs Python dependencies
+                    </div>
+                    <div class="download-feature">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Detects & enables dedicated GPU
+                    </div>
+                    <div class="download-feature">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Starts backend automatically
+                    </div>
+                </div>
+                
+                <a href="${BACKEND_DOWNLOAD_URL}" class="btn btn-primary download-btn-main" download>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Download trafficvision-backend.zip
+                </a>
+                
+                <p class="download-note">
+                    <strong>Requirements:</strong> Python 3.10+, ~2GB disk space<br>
+                    <strong>GPU Support:</strong> NVIDIA (CUDA), AMD (ROCm), Apple Silicon (MPS)
+                </p>
+            </div>
+        `;
+        
+        // Add modal styles dynamically
+        if (!document.getElementById('download-modal-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'download-modal-styles';
+            styles.textContent = `
+                #download-modal {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    z-index: 10000;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    animation: fadeIn 0.3s ease;
+                }
+                .download-modal-overlay {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0,0,0,0.8);
+                    backdrop-filter: blur(4px);
+                }
+                .download-modal-content {
+                    position: relative;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border-subtle);
+                    border-radius: var(--radius-xl);
+                    padding: 32px;
+                    max-width: 580px;
+                    width: 90%;
+                    max-height: 90vh;
+                    overflow-y: auto;
+                    box-shadow: var(--shadow-lg);
+                }
+                .download-modal-close {
+                    position: absolute;
+                    top: 16px;
+                    right: 16px;
+                    background: none;
+                    border: none;
+                    font-size: 28px;
+                    color: var(--text-secondary);
+                    cursor: pointer;
+                    line-height: 1;
+                    padding: 4px;
+                }
+                .download-modal-close:hover { color: var(--text-primary); }
+                .download-modal-content h3 {
+                    font-size: 1.5rem;
+                    margin-bottom: 12px;
+                    color: var(--text-primary);
+                }
+                .download-modal-content > p {
+                    color: var(--text-secondary);
+                    margin-bottom: 24px;
+                }
+                .download-steps {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 16px;
+                    margin-bottom: 24px;
+                }
+                .download-step {
+                    display: flex;
+                    gap: 16px;
+                    padding: 16px;
+                    background: rgba(255,255,255,0.03);
+                    border-radius: var(--radius-md);
+                    border: 1px solid var(--border-subtle);
+                }
+                .step-num {
+                    width: 32px;
+                    height: 32px;
+                    background: var(--gradient-primary);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 700;
+                    flex-shrink: 0;
+                }
+                .download-step strong {
+                    color: var(--text-primary);
+                    display: block;
+                    margin-bottom: 4px;
+                }
+                .download-step p {
+                    color: var(--text-secondary);
+                    font-size: 0.875rem;
+                    margin: 2px 0;
+                }
+                .download-step code {
+                    background: rgba(59,130,246,0.15);
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    font-family: var(--font-mono);
+                    font-size: 0.8rem;
+                    color: var(--accent-blue);
+                }
+                .download-features {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 12px;
+                    margin-bottom: 24px;
+                }
+                .download-feature {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 8px 12px;
+                    background: rgba(16,185,129,0.1);
+                    border: 1px solid rgba(16,185,129,0.2);
+                    border-radius: 100px;
+                    font-size: 0.8rem;
+                    color: var(--accent-green);
+                }
+                .download-feature svg {
+                    stroke: var(--accent-green);
+                }
+                .download-btn-main {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 10px;
+                    width: 100%;
+                    padding: 16px 24px;
+                    font-size: 1rem;
+                    margin-bottom: 16px;
+                }
+                .download-note {
+                    font-size: 0.8rem;
+                    color: var(--text-muted);
+                    text-align: center;
+                    line-height: 1.6;
+                }
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        document.body.appendChild(downloadModal);
+        
+    } catch (error) {
+        console.error('Download error:', error);
+        alert('Failed to initiate download. Please try again.');
+    } finally {
+        // Reset button state
+        btn.classList.remove('downloading');
+        btn.innerHTML = originalContent;
+    }
+}
+
+function closeDownloadModal() {
+    const modal = document.getElementById('download-modal');
+    if (modal) {
+        modal.style.animation = 'fadeOut 0.2s ease forwards';
+        setTimeout(() => modal.remove(), 200);
     }
 }
 
