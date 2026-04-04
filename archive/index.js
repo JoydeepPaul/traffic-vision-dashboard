@@ -317,6 +317,84 @@ function initTrafficAnimation() {
 }
 
 // ===========================
+// SECTION BACKGROUND ENHANCEMENTS
+// ===========================
+function initSectionAnimations() {
+    // Scroll Progress Indicator
+    const scrollProgress = document.getElementById('scroll-progress');
+    if (scrollProgress) {
+        window.addEventListener('scroll', () => {
+            const scrollTop = window.scrollY;
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const scrollPercent = (scrollTop / docHeight) * 100;
+            scrollProgress.style.width = scrollPercent + '%';
+        });
+    }
+    
+    // Add parallax effect to section backgrounds
+    const sections = document.querySelectorAll('.section');
+    
+    // Intersection observer for section visibility animations
+    const sectionObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            const sectionBg = entry.target.querySelector('.section-bg');
+            if (sectionBg) {
+                if (entry.isIntersecting) {
+                    sectionBg.classList.add('active');
+                } else {
+                    sectionBg.classList.remove('active');
+                }
+            }
+        });
+    }, { threshold: 0.1, rootMargin: '50px' });
+    
+    sections.forEach(section => sectionObserver.observe(section));
+    
+    // Mouse move effect for interactive glow
+    document.addEventListener('mousemove', (e) => {
+        const mouseX = e.clientX / window.innerWidth;
+        const mouseY = e.clientY / window.innerHeight;
+        
+        document.documentElement.style.setProperty('--mouse-x', mouseX);
+        document.documentElement.style.setProperty('--mouse-y', mouseY);
+    });
+    
+    // Add random sparkle effects to analytics section
+    const analyticsSection = document.getElementById('analytics');
+    if (analyticsSection) {
+        setInterval(() => {
+            createSparkle(analyticsSection);
+        }, 3000);
+    }
+    
+    // Add typing effect to violation numbers
+    const violationCards = document.querySelectorAll('.v-summary-card');
+    violationCards.forEach(card => {
+        card.addEventListener('mouseenter', () => {
+            card.classList.add('pulse-highlight');
+        });
+        card.addEventListener('mouseleave', () => {
+            card.classList.remove('pulse-highlight');
+        });
+    });
+}
+
+function createSparkle(container) {
+    const sparkle = document.createElement('div');
+    sparkle.className = 'sparkle';
+    sparkle.style.left = Math.random() * 100 + '%';
+    sparkle.style.top = Math.random() * 100 + '%';
+    container.appendChild(sparkle);
+    
+    setTimeout(() => sparkle.remove(), 1000);
+}
+
+// Call the section animations init
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(initSectionAnimations, 100);
+});
+
+// ===========================
 // NAVIGATION
 // ===========================
 function initNavigation() {

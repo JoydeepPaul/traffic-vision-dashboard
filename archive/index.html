@@ -13,6 +13,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 </head>
 <body>
+    <!-- Scroll Progress Indicator -->
+    <div class="scroll-progress" id="scroll-progress"></div>
+    
     <!-- ============ NAVIGATION ============ -->
     <nav class="navbar" id="navbar">
         <div class="nav-container">
@@ -136,6 +139,24 @@
 
     <!-- ============ PIPELINE SECTION ============ -->
     <section class="section pipeline-section" id="pipeline">
+        <!-- Animated Background -->
+        <div class="section-bg pipeline-bg">
+            <div class="circuit-lines">
+                <svg class="circuit-svg" viewBox="0 0 1200 600" preserveAspectRatio="none">
+                    <path class="circuit-path circuit-path-1" d="M0,100 L200,100 L250,150 L400,150 L450,100 L600,100" />
+                    <path class="circuit-path circuit-path-2" d="M600,100 L750,100 L800,200 L1000,200 L1050,150 L1200,150" />
+                    <path class="circuit-path circuit-path-3" d="M0,300 L150,300 L200,250 L350,250 L400,300 L550,300" />
+                    <path class="circuit-path circuit-path-4" d="M650,400 L800,400 L850,350 L1000,350 L1050,400 L1200,400" />
+                </svg>
+            </div>
+            <div class="floating-nodes">
+                <div class="node node-1"></div>
+                <div class="node node-2"></div>
+                <div class="node node-3"></div>
+                <div class="node node-4"></div>
+                <div class="node node-5"></div>
+            </div>
+        </div>
         <div class="container">
             <div class="section-header">
                 <span class="section-tag">Architecture</span>
@@ -231,6 +252,21 @@
 
     <!-- ============ LIVE DEMO SECTION ============ -->
     <section class="section demo-section" id="demo">
+        <!-- Animated Background -->
+        <div class="section-bg demo-bg">
+            <div class="scan-grid"></div>
+            <div class="corner-brackets">
+                <div class="bracket bracket-tl"></div>
+                <div class="bracket bracket-tr"></div>
+                <div class="bracket bracket-bl"></div>
+                <div class="bracket bracket-br"></div>
+            </div>
+            <div class="moving-dots">
+                <div class="dot-trail dot-trail-1"></div>
+                <div class="dot-trail dot-trail-2"></div>
+                <div class="dot-trail dot-trail-3"></div>
+            </div>
+        </div>
         <div class="container">
             <div class="section-header">
                 <span class="section-tag">Interactive</span>
@@ -300,6 +336,33 @@
 
     <!-- ============ ANALYTICS SECTION ============ -->
     <section class="section analytics-section" id="analytics">
+        <!-- Animated Background -->
+        <div class="section-bg analytics-bg">
+            <div class="data-waves">
+                <div class="wave wave-1"></div>
+                <div class="wave wave-2"></div>
+                <div class="wave wave-3"></div>
+            </div>
+            <div class="chart-grid-bg"></div>
+            <div class="floating-charts">
+                <div class="mini-chart mini-chart-1">
+                    <div class="mini-bar" style="height: 60%"></div>
+                    <div class="mini-bar" style="height: 80%"></div>
+                    <div class="mini-bar" style="height: 40%"></div>
+                    <div class="mini-bar" style="height: 90%"></div>
+                    <div class="mini-bar" style="height: 50%"></div>
+                </div>
+                <div class="mini-chart mini-chart-2">
+                    <div class="mini-bar" style="height: 70%"></div>
+                    <div class="mini-bar" style="height: 50%"></div>
+                    <div class="mini-bar" style="height: 85%"></div>
+                    <div class="mini-bar" style="height: 35%"></div>
+                    <div class="mini-bar" style="height: 65%"></div>
+                </div>
+            </div>
+            <div class="particle-cluster particle-cluster-1"></div>
+            <div class="particle-cluster particle-cluster-2"></div>
+        </div>
         <div class="container">
             <div class="section-header">
                 <span class="section-tag">Dashboard</span>
@@ -474,6 +537,22 @@
 
     <!-- ============ VIOLATIONS TABLE SECTION ============ -->
     <section class="section violations-section" id="violations">
+        <!-- Animated Background -->
+        <div class="section-bg violations-bg">
+            <div class="warning-stripes"></div>
+            <div class="alert-pulses">
+                <div class="alert-pulse alert-pulse-1"></div>
+                <div class="alert-pulse alert-pulse-2"></div>
+                <div class="alert-pulse alert-pulse-3"></div>
+            </div>
+            <div class="speed-lines">
+                <div class="speed-line speed-line-1"></div>
+                <div class="speed-line speed-line-2"></div>
+                <div class="speed-line speed-line-3"></div>
+                <div class="speed-line speed-line-4"></div>
+            </div>
+            <div class="hexagon-grid"></div>
+        </div>
         <div class="container">
             <div class="section-header">
                 <span class="section-tag">Enforcement</span>
@@ -577,6 +656,25 @@
 
     <!-- ============ CONFIG SECTION ============ -->
     <section class="section config-section" id="config">
+        <!-- Animated Background -->
+        <div class="section-bg config-bg">
+            <div class="gear-system">
+                <div class="gear gear-1"></div>
+                <div class="gear gear-2"></div>
+                <div class="gear gear-3"></div>
+            </div>
+            <div class="code-rain">
+                <div class="code-column code-column-1"></div>
+                <div class="code-column code-column-2"></div>
+                <div class="code-column code-column-3"></div>
+                <div class="code-column code-column-4"></div>
+            </div>
+            <div class="settings-icons">
+                <div class="float-icon float-icon-1">⚙</div>
+                <div class="float-icon float-icon-2">🔧</div>
+                <div class="float-icon float-icon-3">📊</div>
+            </div>
+        </div>
         <div class="container">
             <div class="section-header">
                 <span class="section-tag">Settings</span>
