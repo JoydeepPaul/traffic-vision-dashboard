@@ -503,6 +503,13 @@ function initCountUpAnimations() {
             if (entry.isIntersecting) {
                 const el = entry.target;
                 const target = parseFloat(el.dataset.count);
+                
+                // Skip animation if target is NaN or invalid
+                if (Number.isNaN(target) || target === null || target === undefined) {
+                    observer.unobserve(el);
+                    return;
+                }
+                
                 const isDecimal = target % 1 !== 0;
                 const duration = 800; // Even faster counter animation
                 const startTime = performance.now();
@@ -2205,9 +2212,11 @@ function setKPICardVal(id, value, suffix = '') {
     if (valEl) {
         // Remove data-count to prevent count-up animation from overwriting
         valEl.removeAttribute('data-count');
-        // Set the value directly
-        valEl.textContent = value ?? '—';
-        console.log(`Updated ${id}:`, value);
+        // Handle NaN, null, undefined - show dash for invalid values
+        const displayValue = (value === null || value === undefined || Number.isNaN(value) || value === 'NaN') 
+            ? '—' 
+            : (typeof value === 'number' ? value.toLocaleString() : value);
+        valEl.textContent = displayValue;
     }
     // Update suffix element if it exists and suffix is provided
     if (suffixEl && suffix) {
