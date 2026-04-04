@@ -558,6 +558,14 @@ function initCharts() {
     Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
     Chart.defaults.font.family = "'Inter', sans-serif";
     
+    // Ensure tooltips are enabled globally with proper events
+    Chart.defaults.plugins.tooltip.enabled = true;
+    Chart.defaults.plugins.tooltip.mode = 'index';
+    Chart.defaults.plugins.tooltip.intersect = false;
+    Chart.defaults.events = ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'];
+    Chart.defaults.hover.mode = 'nearest';
+    Chart.defaults.hover.intersect = true;
+    
     // Disable animations for better performance
     Chart.defaults.animation = {
         duration: 400,
@@ -607,7 +615,8 @@ function createAccuracyChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
+            interaction: { mode: 'nearest', intersect: true },
+            hover: { mode: 'nearest', intersect: true },
             onHover: (event, elements) => {
                 event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
             },
@@ -615,6 +624,8 @@ function createAccuracyChart() {
                 legend: { display: false },
                 tooltip: {
                     enabled: true,
+                    mode: 'index',
+                    intersect: false,
                     backgroundColor: 'rgba(10,14,26,0.95)',
                     borderColor: 'rgba(59, 130, 246, 0.5)',
                     borderWidth: 1,
@@ -664,6 +675,13 @@ function createClassChart() {
                     'rgba(245, 158, 11, 0.8)',
                     'rgba(16, 185, 129, 0.8)',
                 ],
+                hoverBackgroundColor: [
+                    'rgba(59, 130, 246, 1)',
+                    'rgba(139, 92, 246, 1)',
+                    'rgba(6, 182, 212, 1)',
+                    'rgba(245, 158, 11, 1)',
+                    'rgba(16, 185, 129, 1)',
+                ],
                 borderColor: 'rgba(10,14,26,1)',
                 borderWidth: 3,
                 hoverOffset: 10,
@@ -673,6 +691,10 @@ function createClassChart() {
             responsive: true,
             maintainAspectRatio: false,
             cutout: '65%',
+            interaction: {
+                mode: 'nearest',
+                intersect: true
+            },
             onHover: (event, elements) => {
                 event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
             },
@@ -738,7 +760,8 @@ function createSpeedChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
+            interaction: { mode: 'nearest', intersect: true },
+            hover: { mode: 'nearest', intersect: true },
             onHover: (event, elements) => {
                 event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
             },
@@ -746,6 +769,8 @@ function createSpeedChart() {
                 legend: { display: false },
                 tooltip: {
                     enabled: true,
+                    mode: 'nearest',
+                    intersect: true,
                     backgroundColor: 'rgba(10,14,26,0.95)',
                     borderColor: 'rgba(6, 182, 212, 0.5)',
                     borderWidth: 1,
@@ -831,6 +856,7 @@ function createProcessingChart() {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
+            hover: { mode: 'index', intersect: false },
             onHover: (event, elements) => {
                 event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
             },
@@ -838,6 +864,8 @@ function createProcessingChart() {
                 legend: { display: false },
                 tooltip: {
                     enabled: true,
+                    mode: 'index',
+                    intersect: false,
                     backgroundColor: 'rgba(10,14,26,0.95)',
                     borderColor: 'rgba(139, 92, 246, 0.5)',
                     borderWidth: 1,
