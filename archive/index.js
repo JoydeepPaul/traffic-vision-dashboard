@@ -1859,17 +1859,21 @@ function handleProgress(p) {
 
 // ── Fetch & Apply Real Results ────────────────────────────────
 async function fetchAndApplyResults() {
+    console.log('fetchAndApplyResults called');
     try {
         const res  = await fetch(`${API_BASE}/api/results`);
         const data = await res.json();
+        console.log('Results fetched:', data);
         if (!res.ok) { rpLog(`Results error: ${data.error}`, 'danger'); setProgressBadge('error'); return; }
         applyRealResults(data);
     } catch (err) {
+        console.error('fetchAndApplyResults error:', err);
         rpLog(`Network error: ${err}`, 'danger');
     }
 }
 
 function applyRealResults(data) {
+    console.log('applyRealResults called with data:', data);
     updateProgressBar(100, 'complete');
     setProgressBadge('complete');
     setProgressTitle('\u2713 Analysis Complete');
@@ -1879,6 +1883,7 @@ function applyRealResults(data) {
     const kpis    = data.kpis    || {};
     const summary = data.violations_summary || {};
     const charts  = data.chart_data || {};
+    console.log('chart_data:', charts);
 
     rpLog(`Done! ${kpis.videos} videos \u00b7 ${kpis.vehicles} vehicles \u00b7 ${summary.total} violations`, 'success');
 
@@ -1928,10 +1933,20 @@ function applyRealResults(data) {
     }
 
     // Charts
+    console.log('About to update charts. charts object:', charts);
+    console.log('charts.accuracy:', charts.accuracy);
+    console.log('charts.classes:', charts.classes);
+    console.log('charts.speed_distribution:', charts.speed_distribution);
+    console.log('charts.processing:', charts.processing);
+    
     if (charts.accuracy)           updateAccuracyChartReal(charts.accuracy);
+    else console.warn('No accuracy chart data');
     if (charts.classes)            updateClassChartReal(charts.classes);
+    else console.warn('No classes chart data');
     if (charts.speed_distribution) updateSpeedChartReal(charts.speed_distribution);
+    else console.warn('No speed_distribution chart data');
     if (charts.processing)         updateProcessingChartReal(charts.processing);
+    else console.warn('No processing chart data');
 
     // Violations table
     if (Array.isArray(data.violations) && data.violations.length > 0) {
@@ -1994,23 +2009,40 @@ function showDatasetBadge(datasetPath) {
 
 // ── Chart Updaters ────────────────────────────────────────────
 function updateAccuracyChartReal(acc) {
-    const c = Chart.getChart('chart-accuracy');
-    if (!c) return;
+    console.log('Updating accuracy chart with data:', acc);
+    const canvas = document.getElementById('chart-accuracy');
+    const c = Chart.getChart(canvas);
+    if (!c) {
+        console.warn('Accuracy chart not found! Canvas:', canvas);
+        return;
+    }
     c.data.labels = acc.labels;
     c.data.datasets[0].data = acc.detected;
     c.data.datasets[1].data = acc.detected.map(v => Math.round(v * 1.05));
     c.update('active');
+    console.log('Accuracy chart updated successfully');
 }
 function updateClassChartReal(cls) {
-    const c = Chart.getChart('chart-classes');
-    if (!c) return;
+    console.log('Updating class chart with data:', cls);
+    const canvas = document.getElementById('chart-classes');
+    const c = Chart.getChart(canvas);
+    if (!c) {
+        console.warn('Class chart not found! Canvas:', canvas);
+        return;
+    }
     c.data.labels = cls.labels.map(l => l.charAt(0).toUpperCase() + l.slice(1));
     c.data.datasets[0].data = cls.data;
     c.update('active');
+    console.log('Class chart updated successfully');
 }
 function updateSpeedChartReal(spd) {
-    const c = Chart.getChart('chart-speed');
-    if (!c) return;
+    console.log('Updating speed chart with data:', spd);
+    const canvas = document.getElementById('chart-speed');
+    const c = Chart.getChart(canvas);
+    if (!c) {
+        console.warn('Speed chart not found! Canvas:', canvas);
+        return;
+    }
     const limit = parseInt(document.getElementById('cfg-speed')?.value || 50);
     const colors = spd.labels.map(l => parseInt(l.split(/[–-]/)[0], 10) >= limit
         ? 'rgba(239,68,68,0.7)' : 'rgba(6,182,212,0.6)');
@@ -2019,14 +2051,21 @@ function updateSpeedChartReal(spd) {
     c.data.datasets[0].backgroundColor = colors;
     c.data.datasets[0].borderColor = colors.map(col => col.replace('0.7','1').replace('0.6','1'));
     c.update('active');
+    console.log('Speed chart updated successfully');
 }
 function updateProcessingChartReal(proc) {
-    const c = Chart.getChart('chart-processing');
-    if (!c) return;
+    console.log('Updating processing chart with data:', proc);
+    const canvas = document.getElementById('chart-processing');
+    const c = Chart.getChart(canvas);
+    if (!c) {
+        console.warn('Processing chart not found! Canvas:', canvas);
+        return;
+    }
     c.data.labels = proc.labels;
     c.data.datasets[0].data = proc.time;
     c.data.datasets[1].data = proc.frames;
     c.update('active');
+    console.log('Processing chart updated successfully');
 }
 
 // ── Per-Video Results Table ──────────────────────────────────
