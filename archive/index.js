@@ -2,70 +2,15 @@
    TRAFFICVISION AI — Interactive JavaScript
    ============================================ */
 
-// Performance utilities
-const throttle = (fn, ms) => {
-    let lastCall = 0;
-    return (...args) => {
-        const now = Date.now();
-        if (now - lastCall >= ms) {
-            lastCall = now;
-            fn(...args);
-        }
-    };
-};
-
-const debounce = (fn, ms) => {
-    let timeout;
-    return (...args) => {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => fn(...args), ms);
-    };
-};
-
-// RAF-based throttle for smoother animations
-const rafThrottle = (fn) => {
-    let rafId = null;
-    return (...args) => {
-        if (rafId) return;
-        rafId = requestAnimationFrame(() => {
-            fn(...args);
-            rafId = null;
-        });
-    };
-};
-
 document.addEventListener('DOMContentLoaded', () => {
-    // Critical path - render immediately
     initNavigation();
     initScrollAnimations();
-    
-    // Use requestIdleCallback for non-critical tasks
-    if ('requestIdleCallback' in window) {
-        requestIdleCallback(() => {
-            initCountUpAnimations();
-            initCharts();
-            initViolationTable();
-            initConfigPanel();
-        }, { timeout: 1500 });
-        
-        requestIdleCallback(() => {
-            initDemoSimulation();
-            initTrafficAnimation();
-        }, { timeout: 2500 });
-    } else {
-        // Fallback for browsers without requestIdleCallback
-        setTimeout(() => {
-            initCountUpAnimations();
-            initCharts();
-            initViolationTable();
-            initConfigPanel();
-        }, 50);
-        
-        setTimeout(() => {
-            initDemoSimulation();
-            initTrafficAnimation();
-        }, 100);
-    }
+    initCountUpAnimations();
+    initCharts();
+    initViolationTable();
+    initConfigPanel();
+    initDemoSimulation();
+    initTrafficAnimation();
 });
 
 // ===========================
@@ -75,22 +20,16 @@ function initTrafficAnimation() {
     const canvas = document.getElementById('traffic-canvas');
     if (!canvas) return;
     
-    // Check for reduced motion preference
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    
-    const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
+    const ctx = canvas.getContext('2d');
     let animationId;
     let particles = [];
     let vehicles = [];
     let detectionPoints = [];
-    let isVisible = true;
-    let lastFrameTime = 0;
-    const targetFPS = 24; // Lower FPS for background - saves CPU
-    const frameInterval = 1000 / targetFPS;
+    let connectionLines = [];
     
-    // Resize canvas to fill container (debounced)
-    const resizeCanvas = debounce(() => {
-        const dpr = Math.min(window.devicePixelRatio || 1, 1.5); // Cap at 1.5x for performance
+    // Resize canvas to fill container
+    function resizeCanvas() {
+        const dpr = window.devicePixelRatio || 1;
         const rect = canvas.parentElement.getBoundingClientRect();
         canvas.width = rect.width * dpr;
         canvas.height = rect.height * dpr;
@@ -98,35 +37,36 @@ function initTrafficAnimation() {
         canvas.style.height = rect.height + 'px';
         ctx.scale(dpr, dpr);
         
+        // Reinitialize particles on resize
         initParticles();
         initVehicles();
         initDetectionPoints();
-    }, 200);
+    }
     
-    // Initialize floating particles (further reduced)
+    // Initialize floating particles
     function initParticles() {
         const rect = canvas.getBoundingClientRect();
         particles = [];
-        const count = Math.min(Math.floor((rect.width * rect.height) / 35000), 20); // Further reduced
+        const count = Math.floor((rect.width * rect.height) / 15000);
         
         for (let i = 0; i < count; i++) {
             particles.push({
                 x: Math.random() * rect.width,
                 y: Math.random() * rect.height,
                 size: Math.random() * 2 + 0.5,
-                speedX: (Math.random() - 0.5) * 0.15,
-                speedY: (Math.random() - 0.5) * 0.15,
-                opacity: Math.random() * 0.3 + 0.15,
+                speedX: (Math.random() - 0.5) * 0.3,
+                speedY: (Math.random() - 0.5) * 0.3,
+                opacity: Math.random() * 0.5 + 0.2,
                 color: ['#06b6d4', '#3b82f6', '#8b5cf6'][Math.floor(Math.random() * 3)]
             });
         }
     }
     
-    // Initialize moving vehicles (reduced count)
+    // Initialize moving vehicles (represented as glowing rectangles)
     function initVehicles() {
         const rect = canvas.getBoundingClientRect();
         vehicles = [];
-        const vehicleCount = 3; // Further reduced from 4
+        const vehicleCount = 6;
         
         for (let i = 0; i < vehicleCount; i++) {
             const direction = Math.random() > 0.5 ? 1 : -1;
@@ -161,252 +101,297 @@ function initTrafficAnimation() {
         }
     }
     
-    // Draw particles (batch rendering)
+    // Draw particles
     function drawParticles() {
         const rect = canvas.getBoundingClientRect();
-        const w = rect.width;
-        const h = rect.height;
         
-        ctx.save();
         particles.forEach(p => {
+            // Update position
             p.x += p.speedX;
             p.y += p.speedY;
             
-            if (p.x < 0) p.x = w;
-            else if (p.x > w) p.x = 0;
-            if (p.y < 0) p.y = h;
-            else if (p.y > h) p.y = 0;
+            // Wrap around edges
+            if (p.x < 0) p.x = rect.width;
+            if (p.x > rect.width) p.x = 0;
+            if (p.y < 0) p.y = rect.height;
+            if (p.y > rect.height) p.y = 0;
             
-            ctx.globalAlpha = p.opacity;
-            ctx.fillStyle = p.color;
+            // Draw particle
             ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size, 0, 6.28); // Use 6.28 instead of Math.PI * 2
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = p.opacity;
             ctx.fill();
+            ctx.globalAlpha = 1;
         });
-        ctx.restore();
     }
     
-    // Draw connection lines (optimized - skip most connections)
+    // Draw connection lines between nearby particles
     function drawConnections() {
-        const maxDist = 80; // Further reduced for less computation
-        const maxDistSq = maxDist * maxDist;
-        const len = particles.length;
+        const maxDist = 120;
         
-        ctx.save();
-        ctx.lineWidth = 0.5;
-        ctx.strokeStyle = '#3b82f6';
-        
-        // Only draw every other connection for performance
-        for (let i = 0; i < len; i += 2) {
-            const p1 = particles[i];
-            for (let j = i + 2; j < len; j += 2) {
-                const p2 = particles[j];
-                const dx = p1.x - p2.x;
-                const dy = p1.y - p2.y;
-                const distSq = dx * dx + dy * dy;
+        for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < particles.length; j++) {
+                const dx = particles[i].x - particles[j].x;
+                const dy = particles[i].y - particles[j].y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
                 
-                if (distSq < maxDistSq) {
-                    ctx.globalAlpha = (1 - Math.sqrt(distSq) / maxDist) * 0.08;
+                if (dist < maxDist) {
+                    const opacity = (1 - dist / maxDist) * 0.15;
                     ctx.beginPath();
-                    ctx.moveTo(p1.x, p1.y);
-                    ctx.lineTo(p2.x, p2.y);
+                    ctx.moveTo(particles[i].x, particles[i].y);
+                    ctx.lineTo(particles[j].x, particles[j].y);
+                    ctx.strokeStyle = `rgba(59, 130, 246, ${opacity})`;
+                    ctx.lineWidth = 0.5;
                     ctx.stroke();
                 }
             }
         }
-        ctx.restore();
     }
     
-    // Draw vehicles with trails (optimized - shorter trails)
+    // Draw vehicles with trails
     function drawVehicles() {
         const rect = canvas.getBoundingClientRect();
-        const w = rect.width;
         
-        ctx.save();
         vehicles.forEach(v => {
+            // Store trail position
             v.trail.push({ x: v.x, y: v.y });
-            if (v.trail.length > 6) v.trail.shift(); // Shorter trails
+            if (v.trail.length > 20) v.trail.shift();
             
+            // Update position
             v.x += v.speed;
             
-            if (v.x > w + 50) v.x = -50;
-            else if (v.x < -50) v.x = w + 50;
+            // Wrap around
+            if (v.x > rect.width + 50) v.x = -50;
+            if (v.x < -50) v.x = rect.width + 50;
             
-            // Draw trail (simplified - skip most points)
-            const trailLen = v.trail.length;
-            for (let i = 0; i < trailLen; i += 3) {
-                const t = v.trail[i];
-                ctx.globalAlpha = (i / trailLen) * 0.2;
-                ctx.fillStyle = v.color;
+            // Draw trail
+            v.trail.forEach((t, i) => {
+                const trailOpacity = (i / v.trail.length) * 0.3;
                 ctx.beginPath();
-                ctx.arc(t.x, t.y, 2, 0, 6.28);
+                ctx.arc(t.x, t.y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = v.color;
+                ctx.globalAlpha = trailOpacity;
                 ctx.fill();
-            }
+            });
             
-            // Draw vehicle (simplified - no shadow for performance)
-            ctx.globalAlpha = 0.5;
+            // Draw vehicle glow
+            ctx.globalAlpha = 0.3;
+            ctx.shadowColor = v.color;
+            ctx.shadowBlur = 15;
             ctx.fillStyle = v.color;
             ctx.fillRect(v.x - v.width/2, v.y - v.height/2, v.width, v.height);
+            
+            // Draw vehicle body
+            ctx.globalAlpha = 0.8;
+            ctx.shadowBlur = 5;
+            ctx.fillRect(v.x - v.width/2 + 2, v.y - v.height/2 + 1, v.width - 4, v.height - 2);
+            
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
         });
-        ctx.restore();
     }
     
-    // Draw detection points (optimized)
+    // Draw detection points with pulsing effect
     function drawDetectionPoints() {
-        ctx.save();
         detectionPoints.forEach(d => {
+            // Update pulse
             d.pulseRadius += d.speed;
             if (d.pulseRadius > d.maxRadius) d.pulseRadius = 0;
             
             // Draw pulse ring
             const pulseOpacity = 1 - (d.pulseRadius / d.maxRadius);
-            ctx.globalAlpha = pulseOpacity * 0.3;
-            ctx.strokeStyle = d.color;
-            ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.arc(d.x, d.y, d.pulseRadius, 0, 6.28);
+            ctx.arc(d.x, d.y, d.pulseRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = d.color;
+            ctx.globalAlpha = pulseOpacity * 0.4;
+            ctx.lineWidth = 1.5;
             ctx.stroke();
             
             // Draw center point
-            ctx.globalAlpha = 0.7;
-            ctx.fillStyle = d.color;
             ctx.beginPath();
-            ctx.arc(d.x, d.y, d.radius, 0, 6.28);
+            ctx.arc(d.x, d.y, d.radius, 0, Math.PI * 2);
+            ctx.fillStyle = d.color;
+            ctx.globalAlpha = 0.8;
+            ctx.shadowColor = d.color;
+            ctx.shadowBlur = 10;
             ctx.fill();
+            
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
         });
-        ctx.restore();
     }
     
-    // Draw targeting brackets - skip every other frame
-    let bracketFrame = 0;
+    // Draw targeting brackets (like HUD elements)
     function drawTargetingBrackets() {
-        bracketFrame++;
-        if (bracketFrame % 2 !== 0) return; // Skip every other frame
-        
         const rect = canvas.getBoundingClientRect();
         const time = Date.now() * 0.001;
-        const size = 25;
-        const offset = 8;
         
+        // Draw some tracking brackets around random positions
         const positions = [
             { x: rect.width * 0.25, y: rect.height * 0.35 },
-            { x: rect.width * 0.65, y: rect.height * 0.55 }
+            { x: rect.width * 0.65, y: rect.height * 0.55 },
+            { x: rect.width * 0.45, y: rect.height * 0.75 }
         ];
         
-        ctx.save();
-        ctx.strokeStyle = '#06b6d4';
-        ctx.lineWidth = 1;
-        
         positions.forEach((pos, i) => {
-            const pulse = Math.sin(time * 1.5 + i) * 0.2 + 0.4;
-            ctx.globalAlpha = pulse;
+            const pulse = Math.sin(time * 2 + i) * 0.3 + 0.7;
+            const size = 25;
+            const offset = 8;
             
+            ctx.strokeStyle = '#06b6d4';
+            ctx.globalAlpha = 0.4 * pulse;
+            ctx.lineWidth = 1.5;
+            
+            // Top-left bracket
             ctx.beginPath();
             ctx.moveTo(pos.x - size, pos.y - size + offset);
             ctx.lineTo(pos.x - size, pos.y - size);
             ctx.lineTo(pos.x - size + offset, pos.y - size);
+            ctx.stroke();
+            
+            // Top-right bracket
+            ctx.beginPath();
             ctx.moveTo(pos.x + size - offset, pos.y - size);
             ctx.lineTo(pos.x + size, pos.y - size);
             ctx.lineTo(pos.x + size, pos.y - size + offset);
+            ctx.stroke();
+            
+            // Bottom-left bracket
+            ctx.beginPath();
             ctx.moveTo(pos.x - size, pos.y + size - offset);
             ctx.lineTo(pos.x - size, pos.y + size);
             ctx.lineTo(pos.x - size + offset, pos.y + size);
+            ctx.stroke();
+            
+            // Bottom-right bracket
+            ctx.beginPath();
             ctx.moveTo(pos.x + size - offset, pos.y + size);
             ctx.lineTo(pos.x + size, pos.y + size);
             ctx.lineTo(pos.x + size, pos.y + size - offset);
             ctx.stroke();
+            
+            ctx.globalAlpha = 1;
         });
-        ctx.restore();
     }
     
-    // Main animation loop with frame limiting
-    function animate(currentTime) {
-        if (!isVisible) return;
-        
-        animationId = requestAnimationFrame(animate);
-        
-        // Frame rate limiting
-        const elapsed = currentTime - lastFrameTime;
-        if (elapsed < frameInterval) return;
-        lastFrameTime = currentTime - (elapsed % frameInterval);
-        
+    // Main animation loop
+    function animate() {
         const rect = canvas.getBoundingClientRect();
         ctx.clearRect(0, 0, rect.width, rect.height);
         
-        drawParticles();
         drawConnections();
+        drawParticles();
         drawVehicles();
         drawDetectionPoints();
         drawTargetingBrackets();
+        
+        animationId = requestAnimationFrame(animate);
     }
     
     // Initialize
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas, { passive: true });
-    requestAnimationFrame(animate);
+    window.addEventListener('resize', resizeCanvas);
+    animate();
     
-    // Visibility-based animation control
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        cancelAnimationFrame(animationId);
+    });
+    
+    // Reduce animation when hero section not visible (performance)
     const heroSection = document.getElementById('hero');
     if (heroSection) {
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
-                isVisible = entry.isIntersecting;
-                if (isVisible && !animationId) {
-                    requestAnimationFrame(animate);
+                if (entry.isIntersecting) {
+                    if (!animationId) animate();
+                } else {
+                    cancelAnimationFrame(animationId);
+                    animationId = null;
                 }
             });
-        }, { threshold: 0.05 });
+        }, { threshold: 0.1 });
         observer.observe(heroSection);
     }
-    
-    // Pause on tab hidden
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            isVisible = false;
-        } else if (heroSection && heroSection.getBoundingClientRect().top < window.innerHeight) {
-            isVisible = true;
-            requestAnimationFrame(animate);
-        }
-    });
 }
 
 // ===========================
 // SECTION BACKGROUND ENHANCEMENTS
 // ===========================
 function initSectionAnimations() {
-    // Scroll Progress Indicator (RAF throttled for smoothness)
+    // Scroll Progress Indicator
     const scrollProgress = document.getElementById('scroll-progress');
     if (scrollProgress) {
-        const updateScrollProgress = rafThrottle(() => {
+        window.addEventListener('scroll', () => {
             const scrollTop = window.scrollY;
             const docHeight = document.documentElement.scrollHeight - window.innerHeight;
             const scrollPercent = (scrollTop / docHeight) * 100;
             scrollProgress.style.width = scrollPercent + '%';
         });
-        
-        window.addEventListener('scroll', updateScrollProgress, { passive: true });
     }
     
-    // Intersection observer for section visibility animations
+    // Add parallax effect to section backgrounds
     const sections = document.querySelectorAll('.section');
+    
+    // Intersection observer for section visibility animations
     const sectionObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             const sectionBg = entry.target.querySelector('.section-bg');
             if (sectionBg) {
-                sectionBg.classList.toggle('active', entry.isIntersecting);
+                if (entry.isIntersecting) {
+                    sectionBg.classList.add('active');
+                } else {
+                    sectionBg.classList.remove('active');
+                }
             }
         });
-    }, { threshold: 0.1, rootMargin: '100px' });
+    }, { threshold: 0.1, rootMargin: '50px' });
     
     sections.forEach(section => sectionObserver.observe(section));
     
-    // Skip mouse move tracking - too expensive for minimal visual benefit
-    // Sparkle effects completely disabled - reduces DOM operations
+    // Mouse move effect for interactive glow
+    document.addEventListener('mousemove', (e) => {
+        const mouseX = e.clientX / window.innerWidth;
+        const mouseY = e.clientY / window.innerHeight;
+        
+        document.documentElement.style.setProperty('--mouse-x', mouseX);
+        document.documentElement.style.setProperty('--mouse-y', mouseY);
+    });
+    
+    // Add random sparkle effects to analytics section
+    const analyticsSection = document.getElementById('analytics');
+    if (analyticsSection) {
+        setInterval(() => {
+            createSparkle(analyticsSection);
+        }, 3000);
+    }
+    
+    // Add typing effect to violation numbers
+    const violationCards = document.querySelectorAll('.v-summary-card');
+    violationCards.forEach(card => {
+        card.addEventListener('mouseenter', () => {
+            card.classList.add('pulse-highlight');
+        });
+        card.addEventListener('mouseleave', () => {
+            card.classList.remove('pulse-highlight');
+        });
+    });
 }
 
-// Initialize section animations after DOM ready
+function createSparkle(container) {
+    const sparkle = document.createElement('div');
+    sparkle.className = 'sparkle';
+    sparkle.style.left = Math.random() * 100 + '%';
+    sparkle.style.top = Math.random() * 100 + '%';
+    container.appendChild(sparkle);
+    
+    setTimeout(() => sparkle.remove(), 1000);
+}
+
+// Call the section animations init
 document.addEventListener('DOMContentLoaded', () => {
-    requestIdleCallback ? requestIdleCallback(initSectionAnimations, { timeout: 2000 }) : setTimeout(initSectionAnimations, 150);
+    setTimeout(initSectionAnimations, 100);
 });
 
 // ===========================
@@ -418,19 +403,21 @@ function initNavigation() {
     const navLinks = document.getElementById('nav-links');
     const allNavLinks = document.querySelectorAll('.nav-link');
 
-    // Scroll effect (RAF throttled for smooth 60fps)
-    const handleScroll = rafThrottle(() => {
-        navbar.classList.toggle('scrolled', window.scrollY > 60);
+    // Scroll effect
+    window.addEventListener('scroll', () => {
+        if (window.scrollY > 60) {
+            navbar.classList.add('scrolled');
+        } else {
+            navbar.classList.remove('scrolled');
+        }
     });
-    
-    window.addEventListener('scroll', handleScroll, { passive: true });
 
     // Mobile toggle
     navToggle.addEventListener('click', () => {
         navLinks.classList.toggle('open');
     });
 
-    // Active section tracking (using IntersectionObserver - much more efficient)
+    // Active section tracking
     const sections = document.querySelectorAll('section[id]');
     const observerOptions = { rootMargin: '-20% 0px -70% 0px' };
 
@@ -448,7 +435,7 @@ function initNavigation() {
 
     // Close mobile nav on link click
     allNavLinks.forEach(link => {
-        link.addEventListener('click', () => navLinks.classList.remove('open'), { passive: true });
+        link.addEventListener('click', () => navLinks.classList.remove('open'));
     });
 }
 
@@ -460,35 +447,39 @@ function initScrollAnimations() {
         '.pipeline-stage, .kpi-card, .chart-card, .v-summary-card, .config-group'
     );
 
-    // Batch reveal elements without setTimeout delays
     const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
+        entries.forEach((entry, i) => {
             if (entry.isIntersecting) {
-                entry.target.classList.add('visible');
+                setTimeout(() => {
+                    entry.target.classList.add('visible');
+                }, i * 50); // Faster stagger animation
                 observer.unobserve(entry.target);
             }
         });
-    }, { threshold: 0.1, rootMargin: '50px' });
+    }, { threshold: 0.12 }); // Lower threshold for earlier trigger
 
     animateElements.forEach(el => observer.observe(el));
 
-    // Simplified parallax - only when hero is visible
+    // Add subtle parallax effect to hero background
     const heroSection = document.querySelector('.hero');
     const heroBg = document.querySelector('.hero-bg-image');
     
     if (heroSection && heroBg) {
-        const parallaxObserver = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting) {
-                const updateParallax = rafThrottle(() => {
-                    const scrolled = window.scrollY;
-                    if (scrolled < heroSection.offsetHeight) {
-                        heroBg.style.transform = `translateY(${scrolled * 0.3}px) scale(1.1)`;
+        let ticking = false;
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    const scrolled = window.pageYOffset;
+                    const heroBottom = heroSection.offsetHeight;
+                    if (scrolled < heroBottom) {
+                        const parallaxSpeed = scrolled * 0.4;
+                        heroBg.style.transform = `translateY(${parallaxSpeed}px) scale(1.1)`;
                     }
+                    ticking = false;
                 });
-                window.addEventListener('scroll', updateParallax, { passive: true });
+                ticking = true;
             }
-        }, { threshold: 0 });
-        parallaxObserver.observe(heroSection);
+        });
     }
 }
 
@@ -503,22 +494,15 @@ function initCountUpAnimations() {
             if (entry.isIntersecting) {
                 const el = entry.target;
                 const target = parseFloat(el.dataset.count);
-                
-                // Skip animation if target is NaN or invalid
-                if (Number.isNaN(target) || target === null || target === undefined) {
-                    observer.unobserve(el);
-                    return;
-                }
-                
                 const isDecimal = target % 1 !== 0;
-                const duration = 800; // Even faster counter animation
+                const duration = 1200; // Faster counter animation
                 const startTime = performance.now();
 
                 function update(now) {
                     const elapsed = now - startTime;
                     const progress = Math.min(elapsed / duration, 1);
-                    // Ultra snappy ease out
-                    const eased = 1 - Math.pow(1 - progress, 3);
+                    // Snappier ease out quad
+                    const eased = 1 - Math.pow(1 - progress, 2);
                     const current = eased * target;
 
                     if (isDecimal) {
@@ -551,18 +535,9 @@ function initCountUpAnimations() {
 // CHARTS
 // ===========================
 function initCharts() {
-    // Check if chart elements exist before initializing
-    if (!document.getElementById('chart-accuracy')) return;
-    
     Chart.defaults.color = '#8892a8';
     Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
     Chart.defaults.font.family = "'Inter', sans-serif";
-    
-    // Animation settings
-    Chart.defaults.animation = {
-        duration: 400,
-        easing: 'easeOutQuart'
-    };
 
     createAccuracyChart();
     createClassChart();
@@ -608,7 +583,11 @@ function createAccuracyChart() {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    enabled: true
+                    backgroundColor: 'rgba(10,14,26,0.9)',
+                    borderColor: 'rgba(59, 130, 246, 0.3)',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 8,
                 }
             },
             scales: {
@@ -662,7 +641,18 @@ function createClassChart() {
                     }
                 },
                 tooltip: {
-                    enabled: true
+                    backgroundColor: 'rgba(10,14,26,0.9)',
+                    borderColor: 'rgba(59, 130, 246, 0.3)',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 8,
+                    callbacks: {
+                        label: (ctx) => {
+                            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                            const pct = ((ctx.parsed / total) * 100).toFixed(1);
+                            return ` ${ctx.label}: ${ctx.parsed.toLocaleString()} (${pct}%)`;
+                        }
+                    }
                 }
             }
         }
@@ -674,6 +664,10 @@ function createSpeedChart() {
 
     const bins = ['0-10', '10-20', '20-30', '30-40', '40-50', '50-60', '60-70', '70-80', '80-90', '90+'];
     const counts = [120, 340, 680, 920, 780, 420, 180, 85, 35, 12];
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, 'rgba(6, 182, 212, 0.7)');
+    gradient.addColorStop(1, 'rgba(59, 130, 246, 0.1)');
 
     new Chart(ctx, {
         type: 'bar',
@@ -694,7 +688,11 @@ function createSpeedChart() {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    enabled: true
+                    backgroundColor: 'rgba(10,14,26,0.9)',
+                    borderColor: 'rgba(6, 182, 212, 0.3)',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 8,
                 }
             },
             scales: {
@@ -766,10 +764,15 @@ function createProcessingChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    enabled: true
+                    backgroundColor: 'rgba(10,14,26,0.9)',
+                    borderColor: 'rgba(139, 92, 246, 0.3)',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 8,
                 }
             },
             scales: {
@@ -837,29 +840,24 @@ function generateViolationData() {
 }
 
 function initViolationTable() {
-    const searchInput = document.getElementById('violation-search');
-    const severityFilter = document.getElementById('severity-filter');
-    if (!searchInput || !severityFilter) return;
-    
     renderTable();
     
-    // Debounce search input for better performance
-    let searchTimeout;
-    searchInput.addEventListener('input', (e) => {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            const q = e.target.value.toLowerCase();
-            filteredData = VIOLATION_DATA.filter(d =>
-                d.track_id.toString().includes(q) || d.video.toLowerCase().includes(q)
-            );
-            currentPage = 1;
-            renderTable();
-        }, 150);
+    document.getElementById('violation-search').addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase();
+        filteredData = VIOLATION_DATA.filter(d =>
+            d.track_id.toString().includes(q) || d.video.toLowerCase().includes(q)
+        );
+        currentPage = 1;
+        renderTable();
     });
 
-    severityFilter.addEventListener('change', (e) => {
+    document.getElementById('severity-filter').addEventListener('change', (e) => {
         const val = e.target.value;
-        filteredData = val === 'all' ? [...VIOLATION_DATA] : VIOLATION_DATA.filter(d => d.severity === val);
+        if (val === 'all') {
+            filteredData = [...VIOLATION_DATA];
+        } else {
+            filteredData = VIOLATION_DATA.filter(d => d.severity === val);
+        }
         currentPage = 1;
         renderTable();
     });
@@ -868,17 +866,13 @@ function initViolationTable() {
 function renderTable() {
     const tbody = document.getElementById('violations-tbody');
     const pagEl = document.getElementById('table-pagination');
-    if (!tbody || !pagEl) return;
 
     const totalPages = Math.ceil(filteredData.length / rowsPerPage);
     const start = (currentPage - 1) * rowsPerPage;
     const pageData = filteredData.slice(start, start + rowsPerPage);
 
-    // Use document fragment for better performance
-    const fragment = document.createDocumentFragment();
-    pageData.forEach(d => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
+    tbody.innerHTML = pageData.map(d => `
+        <tr>
             <td>#${d.track_id}</td>
             <td>${d.video}</td>
             <td>${d.frame}</td>
@@ -887,33 +881,34 @@ function renderTable() {
             <td>+${d.excess}</td>
             <td>${d.confidence}</td>
             <td><span class="severity-badge severity-${d.severity}">${d.severity}</span></td>
-        `;
-        fragment.appendChild(tr);
-    });
-    tbody.innerHTML = '';
-    tbody.appendChild(fragment);
+        </tr>
+    `).join('');
 
-    // Pagination with event delegation
+    // Pagination
+    let pagHTML = '';
     const maxVisible = 5;
     let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
     let endPage = Math.min(totalPages, startPage + maxVisible - 1);
     if (endPage - startPage < maxVisible - 1) startPage = Math.max(1, endPage - maxVisible + 1);
 
-    let pagHTML = currentPage > 1 ? `<button class="page-btn" data-page="${currentPage - 1}">‹</button>` : '';
+    if (currentPage > 1) {
+        pagHTML += `<button class="page-btn" data-page="${currentPage - 1}">‹</button>`;
+    }
     for (let p = startPage; p <= endPage; p++) {
         pagHTML += `<button class="page-btn ${p === currentPage ? 'active' : ''}" data-page="${p}">${p}</button>`;
     }
-    if (currentPage < totalPages) pagHTML += `<button class="page-btn" data-page="${currentPage + 1}">›</button>`;
+    if (currentPage < totalPages) {
+        pagHTML += `<button class="page-btn" data-page="${currentPage + 1}">›</button>`;
+    }
 
     pagEl.innerHTML = pagHTML;
-    
-    // Single event listener with delegation
-    pagEl.onclick = (e) => {
-        if (e.target.classList.contains('page-btn')) {
-            currentPage = parseInt(e.target.dataset.page);
+
+    pagEl.querySelectorAll('.page-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentPage = parseInt(btn.dataset.page);
             renderTable();
-        }
-    };
+        });
+    });
 }
 
 // ===========================
@@ -1867,11 +1862,9 @@ async function fetchAndApplyResults() {
     try {
         const res  = await fetch(`${API_BASE}/api/results`);
         const data = await res.json();
-        console.log('Results data received:', data); // Debug logging
         if (!res.ok) { rpLog(`Results error: ${data.error}`, 'danger'); setProgressBadge('error'); return; }
         applyRealResults(data);
     } catch (err) {
-        console.error('Fetch results error:', err);
         rpLog(`Network error: ${err}`, 'danger');
     }
 }
@@ -1934,8 +1927,7 @@ function applyRealResults(data) {
         if (el('v-rate'))      el('v-rate').textContent      = summary.violation_rate;
     }
 
-    // Charts - log what we're about to update
-    console.log('Chart data received:', charts);
+    // Charts
     if (charts.accuracy)           updateAccuracyChartReal(charts.accuracy);
     if (charts.classes)            updateClassChartReal(charts.classes);
     if (charts.speed_distribution) updateSpeedChartReal(charts.speed_distribution);
@@ -2003,8 +1995,7 @@ function showDatasetBadge(datasetPath) {
 // ── Chart Updaters ────────────────────────────────────────────
 function updateAccuracyChartReal(acc) {
     const c = Chart.getChart('chart-accuracy');
-    if (!c) { console.warn('Accuracy chart not found'); return; }
-    console.log('Updating accuracy chart with:', acc);
+    if (!c) return;
     c.data.labels = acc.labels;
     c.data.datasets[0].data = acc.detected;
     c.data.datasets[1].data = acc.detected.map(v => Math.round(v * 1.05));
@@ -2012,16 +2003,14 @@ function updateAccuracyChartReal(acc) {
 }
 function updateClassChartReal(cls) {
     const c = Chart.getChart('chart-classes');
-    if (!c) { console.warn('Classes chart not found'); return; }
-    console.log('Updating class chart with:', cls);
+    if (!c) return;
     c.data.labels = cls.labels.map(l => l.charAt(0).toUpperCase() + l.slice(1));
     c.data.datasets[0].data = cls.data;
     c.update('active');
 }
 function updateSpeedChartReal(spd) {
     const c = Chart.getChart('chart-speed');
-    if (!c) { console.warn('Speed chart not found'); return; }
-    console.log('Updating speed chart with:', spd);
+    if (!c) return;
     const limit = parseInt(document.getElementById('cfg-speed')?.value || 50);
     const colors = spd.labels.map(l => parseInt(l.split(/[–-]/)[0], 10) >= limit
         ? 'rgba(239,68,68,0.7)' : 'rgba(6,182,212,0.6)');
@@ -2033,8 +2022,7 @@ function updateSpeedChartReal(spd) {
 }
 function updateProcessingChartReal(proc) {
     const c = Chart.getChart('chart-processing');
-    if (!c) { console.warn('Processing chart not found'); return; }
-    console.log('Updating processing chart with:', proc);
+    if (!c) return;
     c.data.labels = proc.labels;
     c.data.datasets[0].data = proc.time;
     c.data.datasets[1].data = proc.frames;
@@ -2115,20 +2103,12 @@ function goToPerVideoPage(page) {
 // ── Tiny helpers ─────────────────────────────────────────────
 function setKPICardVal(id, value, suffix = '') {
     const card = document.getElementById(id);
-    if (!card) {
-        console.warn(`KPI card not found: ${id}`);
-        return;
-    }
+    if (!card) return;
     const valEl = card.querySelector('.kpi-value');
     const suffixEl = card.querySelector('.kpi-suffix');
     if (valEl) {
-        // Remove data-count to prevent count-up animation from overwriting
-        valEl.removeAttribute('data-count');
-        // Handle NaN, null, undefined - show dash for invalid values
-        const displayValue = (value === null || value === undefined || Number.isNaN(value) || value === 'NaN') 
-            ? '—' 
-            : (typeof value === 'number' ? value.toLocaleString() : value);
-        valEl.textContent = displayValue;
+        // Only set value, not suffix (suffix is already in HTML or passed separately)
+        valEl.textContent = value ?? '—';
     }
     // Update suffix element if it exists and suffix is provided
     if (suffixEl && suffix) {
