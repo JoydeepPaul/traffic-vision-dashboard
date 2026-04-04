@@ -579,6 +579,7 @@ function createAccuracyChart() {
                     label: 'Detected',
                     data: detected,
                     backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                    hoverBackgroundColor: 'rgba(59, 130, 246, 0.9)',
                     borderColor: 'rgba(59, 130, 246, 1)',
                     borderWidth: 1,
                     borderRadius: 4,
@@ -588,6 +589,7 @@ function createAccuracyChart() {
                     label: 'Ground Truth',
                     data: groundTruth,
                     backgroundColor: 'rgba(16, 185, 129, 0.4)',
+                    hoverBackgroundColor: 'rgba(16, 185, 129, 0.7)',
                     borderColor: 'rgba(16, 185, 129, 0.8)',
                     borderWidth: 1,
                     borderRadius: 4,
@@ -599,6 +601,9 @@ function createAccuracyChart() {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
+            onHover: (event, elements) => {
+                event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -612,6 +617,14 @@ function createAccuracyChart() {
                     bodyFont: { size: 12 },
                     displayColors: true,
                     boxPadding: 6,
+                    callbacks: {
+                        title: (items) => `Video: ${items[0].label}`,
+                        label: (ctx) => {
+                            const label = ctx.dataset.label || '';
+                            const value = ctx.parsed.y;
+                            return ` ${label}: ${value.toLocaleString()} vehicles`;
+                        }
+                    }
                 }
             },
             scales: {
@@ -653,6 +666,9 @@ function createClassChart() {
             responsive: true,
             maintainAspectRatio: false,
             cutout: '65%',
+            onHover: (event, elements) => {
+                event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+            },
             plugins: {
                 legend: {
                     position: 'right',
@@ -706,6 +722,7 @@ function createSpeedChart() {
                 label: 'Vehicles',
                 data: counts,
                 backgroundColor: counts.map((_, i) => i >= 5 ? 'rgba(239, 68, 68, 0.7)' : 'rgba(6, 182, 212, 0.6)'),
+                hoverBackgroundColor: counts.map((_, i) => i >= 5 ? 'rgba(239, 68, 68, 0.9)' : 'rgba(6, 182, 212, 0.85)'),
                 borderColor: counts.map((_, i) => i >= 5 ? 'rgba(239, 68, 68, 1)' : 'rgba(6, 182, 212, 1)'),
                 borderWidth: 1,
                 borderRadius: 4,
@@ -715,6 +732,9 @@ function createSpeedChart() {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
+            onHover: (event, elements) => {
+                event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -804,6 +824,9 @@ function createProcessingChart() {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
+            onHover: (event, elements) => {
+                event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -818,10 +841,14 @@ function createProcessingChart() {
                     displayColors: true,
                     boxPadding: 6,
                     callbacks: {
+                        title: (items) => `Video: ${items[0].label}`,
                         label: (ctx) => {
                             const label = ctx.dataset.label;
                             const value = ctx.parsed.y;
-                            return ` ${label}: ${value.toLocaleString()}`;
+                            if (label.includes('Time')) {
+                                return ` ${label}: ${value.toFixed(1)}s`;
+                            }
+                            return ` ${label}: ${value.toLocaleString()} frames`;
                         }
                     }
                 }
