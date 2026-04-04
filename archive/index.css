@@ -82,12 +82,8 @@
 }
 
 /* Optimize rendering */
-img, video {
+img, video, canvas {
     content-visibility: auto;
-}
-/* Chart canvases need full visibility for tooltips */
-.chart-body canvas {
-    content-visibility: visible;
 }
 * {
     -webkit-font-smoothing: antialiased;
@@ -1417,8 +1413,6 @@ input, select {
     padding: 24px;
     backdrop-filter: blur(8px);
     transition: all var(--transition-base);
-    position: relative;
-    overflow: visible; /* Allow tooltips to overflow */
 }
 
 .chart-card:hover {
@@ -1465,13 +1459,6 @@ input, select {
 .chart-body {
     position: relative;
     height: 280px;
-    overflow: visible; /* Allow tooltips to overflow */
-}
-
-/* Chart.js canvas - ensure tooltips work */
-.chart-body canvas {
-    position: relative;
-    z-index: 1;
 }
 
 .chart-card-wide .chart-body {
@@ -3269,8 +3256,6 @@ input, select {
     );
     opacity: 0;
     transition: opacity 0.3s ease;
-    pointer-events: none; /* Don't block chart interactions */
-    z-index: 0;
 }
 
 .chart-card:hover::after {

@@ -558,15 +558,7 @@ function initCharts() {
     Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
     Chart.defaults.font.family = "'Inter', sans-serif";
     
-    // Ensure tooltips are enabled globally with proper events
-    Chart.defaults.plugins.tooltip.enabled = true;
-    Chart.defaults.plugins.tooltip.mode = 'index';
-    Chart.defaults.plugins.tooltip.intersect = false;
-    Chart.defaults.events = ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'];
-    Chart.defaults.hover.mode = 'nearest';
-    Chart.defaults.hover.intersect = true;
-    
-    // Disable animations for better performance
+    // Animation settings
     Chart.defaults.animation = {
         duration: 400,
         easing: 'easeOutQuart'
@@ -594,7 +586,6 @@ function createAccuracyChart() {
                     label: 'Detected',
                     data: detected,
                     backgroundColor: 'rgba(59, 130, 246, 0.7)',
-                    hoverBackgroundColor: 'rgba(59, 130, 246, 0.9)',
                     borderColor: 'rgba(59, 130, 246, 1)',
                     borderWidth: 1,
                     borderRadius: 4,
@@ -604,7 +595,6 @@ function createAccuracyChart() {
                     label: 'Ground Truth',
                     data: groundTruth,
                     backgroundColor: 'rgba(16, 185, 129, 0.4)',
-                    hoverBackgroundColor: 'rgba(16, 185, 129, 0.7)',
                     borderColor: 'rgba(16, 185, 129, 0.8)',
                     borderWidth: 1,
                     borderRadius: 4,
@@ -615,34 +605,10 @@ function createAccuracyChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: { mode: 'nearest', intersect: true },
-            hover: { mode: 'nearest', intersect: true },
-            onHover: (event, elements) => {
-                event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
-            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    enabled: true,
-                    mode: 'index',
-                    intersect: false,
-                    backgroundColor: 'rgba(10,14,26,0.95)',
-                    borderColor: 'rgba(59, 130, 246, 0.5)',
-                    borderWidth: 1,
-                    padding: 12,
-                    cornerRadius: 8,
-                    titleFont: { size: 13, weight: '600' },
-                    bodyFont: { size: 12 },
-                    displayColors: true,
-                    boxPadding: 6,
-                    callbacks: {
-                        title: (items) => `Video: ${items[0].label}`,
-                        label: (ctx) => {
-                            const label = ctx.dataset.label || '';
-                            const value = ctx.parsed.y;
-                            return ` ${label}: ${value.toLocaleString()} vehicles`;
-                        }
-                    }
+                    enabled: true
                 }
             },
             scales: {
@@ -675,13 +641,6 @@ function createClassChart() {
                     'rgba(245, 158, 11, 0.8)',
                     'rgba(16, 185, 129, 0.8)',
                 ],
-                hoverBackgroundColor: [
-                    'rgba(59, 130, 246, 1)',
-                    'rgba(139, 92, 246, 1)',
-                    'rgba(6, 182, 212, 1)',
-                    'rgba(245, 158, 11, 1)',
-                    'rgba(16, 185, 129, 1)',
-                ],
                 borderColor: 'rgba(10,14,26,1)',
                 borderWidth: 3,
                 hoverOffset: 10,
@@ -691,13 +650,6 @@ function createClassChart() {
             responsive: true,
             maintainAspectRatio: false,
             cutout: '65%',
-            interaction: {
-                mode: 'nearest',
-                intersect: true
-            },
-            onHover: (event, elements) => {
-                event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
-            },
             plugins: {
                 legend: {
                     position: 'right',
@@ -710,23 +662,7 @@ function createClassChart() {
                     }
                 },
                 tooltip: {
-                    enabled: true,
-                    backgroundColor: 'rgba(10,14,26,0.95)',
-                    borderColor: 'rgba(59, 130, 246, 0.5)',
-                    borderWidth: 1,
-                    padding: 12,
-                    cornerRadius: 8,
-                    titleFont: { size: 13, weight: '600' },
-                    bodyFont: { size: 12 },
-                    displayColors: true,
-                    boxPadding: 6,
-                    callbacks: {
-                        label: (ctx) => {
-                            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-                            const pct = ((ctx.parsed / total) * 100).toFixed(1);
-                            return ` ${ctx.label}: ${ctx.parsed.toLocaleString()} (${pct}%)`;
-                        }
-                    }
+                    enabled: true
                 }
             }
         }
@@ -739,10 +675,6 @@ function createSpeedChart() {
     const bins = ['0-10', '10-20', '20-30', '30-40', '40-50', '50-60', '60-70', '70-80', '80-90', '90+'];
     const counts = [120, 340, 680, 920, 780, 420, 180, 85, 35, 12];
 
-    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-    gradient.addColorStop(0, 'rgba(6, 182, 212, 0.7)');
-    gradient.addColorStop(1, 'rgba(59, 130, 246, 0.1)');
-
     new Chart(ctx, {
         type: 'bar',
         data: {
@@ -751,7 +683,6 @@ function createSpeedChart() {
                 label: 'Vehicles',
                 data: counts,
                 backgroundColor: counts.map((_, i) => i >= 5 ? 'rgba(239, 68, 68, 0.7)' : 'rgba(6, 182, 212, 0.6)'),
-                hoverBackgroundColor: counts.map((_, i) => i >= 5 ? 'rgba(239, 68, 68, 0.9)' : 'rgba(6, 182, 212, 0.85)'),
                 borderColor: counts.map((_, i) => i >= 5 ? 'rgba(239, 68, 68, 1)' : 'rgba(6, 182, 212, 1)'),
                 borderWidth: 1,
                 borderRadius: 4,
@@ -760,30 +691,10 @@ function createSpeedChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: { mode: 'nearest', intersect: true },
-            hover: { mode: 'nearest', intersect: true },
-            onHover: (event, elements) => {
-                event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
-            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    enabled: true,
-                    mode: 'nearest',
-                    intersect: true,
-                    backgroundColor: 'rgba(10,14,26,0.95)',
-                    borderColor: 'rgba(6, 182, 212, 0.5)',
-                    borderWidth: 1,
-                    padding: 12,
-                    cornerRadius: 8,
-                    titleFont: { size: 13, weight: '600' },
-                    bodyFont: { size: 12 },
-                    displayColors: true,
-                    boxPadding: 6,
-                    callbacks: {
-                        title: (items) => `Speed: ${items[0].label} km/h`,
-                        label: (ctx) => ` Vehicles: ${ctx.parsed.y.toLocaleString()}`
-                    }
+                    enabled: true
                 }
             },
             scales: {
@@ -855,37 +766,10 @@ function createProcessingChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            hover: { mode: 'index', intersect: false },
-            onHover: (event, elements) => {
-                event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
-            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    enabled: true,
-                    mode: 'index',
-                    intersect: false,
-                    backgroundColor: 'rgba(10,14,26,0.95)',
-                    borderColor: 'rgba(139, 92, 246, 0.5)',
-                    borderWidth: 1,
-                    padding: 12,
-                    cornerRadius: 8,
-                    titleFont: { size: 13, weight: '600' },
-                    bodyFont: { size: 12 },
-                    displayColors: true,
-                    boxPadding: 6,
-                    callbacks: {
-                        title: (items) => `Video: ${items[0].label}`,
-                        label: (ctx) => {
-                            const label = ctx.dataset.label;
-                            const value = ctx.parsed.y;
-                            if (label.includes('Time')) {
-                                return ` ${label}: ${value.toFixed(1)}s`;
-                            }
-                            return ` ${label}: ${value.toLocaleString()} frames`;
-                        }
-                    }
+                    enabled: true
                 }
             },
             scales: {
