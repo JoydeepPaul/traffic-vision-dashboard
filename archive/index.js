@@ -22,8 +22,20 @@ const debounce = (fn, ms) => {
     };
 };
 
+// RAF-based throttle for smoother animations
+const rafThrottle = (fn) => {
+    let rafId = null;
+    return (...args) => {
+        if (rafId) return;
+        rafId = requestAnimationFrame(() => {
+            fn(...args);
+            rafId = null;
+        });
+    };
+};
+
 document.addEventListener('DOMContentLoaded', () => {
-    // Defer non-critical initialization
+    // Critical path - render immediately
     initNavigation();
     initScrollAnimations();
     
@@ -34,12 +46,12 @@ document.addEventListener('DOMContentLoaded', () => {
             initCharts();
             initViolationTable();
             initConfigPanel();
-        }, { timeout: 2000 });
+        }, { timeout: 1500 });
         
         requestIdleCallback(() => {
             initDemoSimulation();
             initTrafficAnimation();
-        }, { timeout: 3000 });
+        }, { timeout: 2500 });
     } else {
         // Fallback for browsers without requestIdleCallback
         setTimeout(() => {
@@ -47,12 +59,12 @@ document.addEventListener('DOMContentLoaded', () => {
             initCharts();
             initViolationTable();
             initConfigPanel();
-        }, 100);
+        }, 50);
         
         setTimeout(() => {
             initDemoSimulation();
             initTrafficAnimation();
-        }, 200);
+        }, 100);
     }
 });
 
@@ -66,19 +78,19 @@ function initTrafficAnimation() {
     // Check for reduced motion preference
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     
-    const ctx = canvas.getContext('2d', { alpha: true });
+    const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
     let animationId;
     let particles = [];
     let vehicles = [];
     let detectionPoints = [];
     let isVisible = true;
     let lastFrameTime = 0;
-    const targetFPS = 30; // Limit to 30 FPS for smoother performance
+    const targetFPS = 24; // Lower FPS for background - saves CPU
     const frameInterval = 1000 / targetFPS;
     
     // Resize canvas to fill container (debounced)
     const resizeCanvas = debounce(() => {
-        const dpr = Math.min(window.devicePixelRatio || 1, 2); // Cap at 2x for performance
+        const dpr = Math.min(window.devicePixelRatio || 1, 1.5); // Cap at 1.5x for performance
         const rect = canvas.parentElement.getBoundingClientRect();
         canvas.width = rect.width * dpr;
         canvas.height = rect.height * dpr;
@@ -89,22 +101,22 @@ function initTrafficAnimation() {
         initParticles();
         initVehicles();
         initDetectionPoints();
-    }, 150);
+    }, 200);
     
-    // Initialize floating particles (reduced count)
+    // Initialize floating particles (further reduced)
     function initParticles() {
         const rect = canvas.getBoundingClientRect();
         particles = [];
-        const count = Math.min(Math.floor((rect.width * rect.height) / 25000), 30); // Reduced count
+        const count = Math.min(Math.floor((rect.width * rect.height) / 35000), 20); // Further reduced
         
         for (let i = 0; i < count; i++) {
             particles.push({
                 x: Math.random() * rect.width,
                 y: Math.random() * rect.height,
                 size: Math.random() * 2 + 0.5,
-                speedX: (Math.random() - 0.5) * 0.2,
-                speedY: (Math.random() - 0.5) * 0.2,
-                opacity: Math.random() * 0.4 + 0.2,
+                speedX: (Math.random() - 0.5) * 0.15,
+                speedY: (Math.random() - 0.5) * 0.15,
+                opacity: Math.random() * 0.3 + 0.15,
                 color: ['#06b6d4', '#3b82f6', '#8b5cf6'][Math.floor(Math.random() * 3)]
             });
         }
@@ -114,7 +126,7 @@ function initTrafficAnimation() {
     function initVehicles() {
         const rect = canvas.getBoundingClientRect();
         vehicles = [];
-        const vehicleCount = 4; // Reduced from 6
+        const vehicleCount = 3; // Further reduced from 4
         
         for (let i = 0; i < vehicleCount; i++) {
             const direction = Math.random() > 0.5 ? 1 : -1;
@@ -174,27 +186,27 @@ function initTrafficAnimation() {
         ctx.restore();
     }
     
-    // Draw connection lines (optimized - skip distant pairs early)
+    // Draw connection lines (optimized - skip most connections)
     function drawConnections() {
-        const maxDist = 100; // Reduced from 120
+        const maxDist = 80; // Further reduced for less computation
         const maxDistSq = maxDist * maxDist;
         const len = particles.length;
         
         ctx.save();
         ctx.lineWidth = 0.5;
+        ctx.strokeStyle = '#3b82f6';
         
-        for (let i = 0; i < len; i++) {
+        // Only draw every other connection for performance
+        for (let i = 0; i < len; i += 2) {
             const p1 = particles[i];
-            for (let j = i + 1; j < len; j++) {
+            for (let j = i + 2; j < len; j += 2) {
                 const p2 = particles[j];
                 const dx = p1.x - p2.x;
                 const dy = p1.y - p2.y;
-                const distSq = dx * dx + dy * dy; // Skip sqrt for comparison
+                const distSq = dx * dx + dy * dy;
                 
                 if (distSq < maxDistSq) {
-                    const opacity = (1 - Math.sqrt(distSq) / maxDist) * 0.12;
-                    ctx.globalAlpha = opacity;
-                    ctx.strokeStyle = '#3b82f6';
+                    ctx.globalAlpha = (1 - Math.sqrt(distSq) / maxDist) * 0.08;
                     ctx.beginPath();
                     ctx.moveTo(p1.x, p1.y);
                     ctx.lineTo(p2.x, p2.y);
@@ -205,7 +217,7 @@ function initTrafficAnimation() {
         ctx.restore();
     }
     
-    // Draw vehicles with trails (optimized)
+    // Draw vehicles with trails (optimized - shorter trails)
     function drawVehicles() {
         const rect = canvas.getBoundingClientRect();
         const w = rect.width;
@@ -213,18 +225,18 @@ function initTrafficAnimation() {
         ctx.save();
         vehicles.forEach(v => {
             v.trail.push({ x: v.x, y: v.y });
-            if (v.trail.length > 10) v.trail.shift(); // Reduced trail length
+            if (v.trail.length > 6) v.trail.shift(); // Shorter trails
             
             v.x += v.speed;
             
             if (v.x > w + 50) v.x = -50;
             else if (v.x < -50) v.x = w + 50;
             
-            // Draw trail (simplified)
+            // Draw trail (simplified - skip most points)
             const trailLen = v.trail.length;
-            for (let i = 0; i < trailLen; i += 2) {
+            for (let i = 0; i < trailLen; i += 3) {
                 const t = v.trail[i];
-                ctx.globalAlpha = (i / trailLen) * 0.25;
+                ctx.globalAlpha = (i / trailLen) * 0.2;
                 ctx.fillStyle = v.color;
                 ctx.beginPath();
                 ctx.arc(t.x, t.y, 2, 0, 6.28);
@@ -232,7 +244,7 @@ function initTrafficAnimation() {
             }
             
             // Draw vehicle (simplified - no shadow for performance)
-            ctx.globalAlpha = 0.6;
+            ctx.globalAlpha = 0.5;
             ctx.fillStyle = v.color;
             ctx.fillRect(v.x - v.width/2, v.y - v.height/2, v.width, v.height);
         });
@@ -265,8 +277,12 @@ function initTrafficAnimation() {
         ctx.restore();
     }
     
-    // Draw targeting brackets (simplified)
+    // Draw targeting brackets - skip every other frame
+    let bracketFrame = 0;
     function drawTargetingBrackets() {
+        bracketFrame++;
+        if (bracketFrame % 2 !== 0) return; // Skip every other frame
+        
         const rect = canvas.getBoundingClientRect();
         const time = Date.now() * 0.001;
         const size = 25;
@@ -275,31 +291,26 @@ function initTrafficAnimation() {
         const positions = [
             { x: rect.width * 0.25, y: rect.height * 0.35 },
             { x: rect.width * 0.65, y: rect.height * 0.55 }
-        ]; // Reduced from 3 to 2
+        ];
         
         ctx.save();
         ctx.strokeStyle = '#06b6d4';
         ctx.lineWidth = 1;
         
         positions.forEach((pos, i) => {
-            const pulse = Math.sin(time * 2 + i) * 0.2 + 0.5;
+            const pulse = Math.sin(time * 1.5 + i) * 0.2 + 0.4;
             ctx.globalAlpha = pulse;
             
-            // All brackets in one path for efficiency
             ctx.beginPath();
-            // Top-left
             ctx.moveTo(pos.x - size, pos.y - size + offset);
             ctx.lineTo(pos.x - size, pos.y - size);
             ctx.lineTo(pos.x - size + offset, pos.y - size);
-            // Top-right
             ctx.moveTo(pos.x + size - offset, pos.y - size);
             ctx.lineTo(pos.x + size, pos.y - size);
             ctx.lineTo(pos.x + size, pos.y - size + offset);
-            // Bottom-left
             ctx.moveTo(pos.x - size, pos.y + size - offset);
             ctx.lineTo(pos.x - size, pos.y + size);
             ctx.lineTo(pos.x - size + offset, pos.y + size);
-            // Bottom-right
             ctx.moveTo(pos.x + size - offset, pos.y + size);
             ctx.lineTo(pos.x + size, pos.y + size);
             ctx.lineTo(pos.x + size, pos.y + size - offset);
@@ -363,75 +374,39 @@ function initTrafficAnimation() {
 // SECTION BACKGROUND ENHANCEMENTS
 // ===========================
 function initSectionAnimations() {
-    // Scroll Progress Indicator (throttled)
+    // Scroll Progress Indicator (RAF throttled for smoothness)
     const scrollProgress = document.getElementById('scroll-progress');
     if (scrollProgress) {
-        const updateScrollProgress = throttle(() => {
+        const updateScrollProgress = rafThrottle(() => {
             const scrollTop = window.scrollY;
             const docHeight = document.documentElement.scrollHeight - window.innerHeight;
             const scrollPercent = (scrollTop / docHeight) * 100;
             scrollProgress.style.width = scrollPercent + '%';
-        }, 16); // ~60fps max
+        });
         
         window.addEventListener('scroll', updateScrollProgress, { passive: true });
     }
     
-    // Add parallax effect to section backgrounds
-    const sections = document.querySelectorAll('.section');
-    
     // Intersection observer for section visibility animations
+    const sections = document.querySelectorAll('.section');
     const sectionObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             const sectionBg = entry.target.querySelector('.section-bg');
             if (sectionBg) {
-                if (entry.isIntersecting) {
-                    sectionBg.classList.add('active');
-                } else {
-                    sectionBg.classList.remove('active');
-                }
+                sectionBg.classList.toggle('active', entry.isIntersecting);
             }
         });
-    }, { threshold: 0.1, rootMargin: '50px' });
+    }, { threshold: 0.1, rootMargin: '100px' });
     
     sections.forEach(section => sectionObserver.observe(section));
     
-    // Mouse move effect (heavily throttled)
-    const updateMousePos = throttle((e) => {
-        const mouseX = e.clientX / window.innerWidth;
-        const mouseY = e.clientY / window.innerHeight;
-        document.documentElement.style.setProperty('--mouse-x', mouseX);
-        document.documentElement.style.setProperty('--mouse-y', mouseY);
-    }, 50); // Only update every 50ms
-    
-    document.addEventListener('mousemove', updateMousePos, { passive: true });
-    
-    // Sparkle effects (reduced frequency, only when visible)
-    const analyticsSection = document.getElementById('analytics');
-    if (analyticsSection) {
-        let sparkleInterval;
-        const analyticsObserver = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting) {
-                sparkleInterval = setInterval(() => createSparkle(analyticsSection), 5000);
-            } else {
-                clearInterval(sparkleInterval);
-            }
-        }, { threshold: 0.1 });
-        analyticsObserver.observe(analyticsSection);
-    }
-}
-
-function createSparkle(container) {
-    if (document.hidden) return; // Don't create sparkles when tab is hidden
-    const sparkle = document.createElement('div');
-    sparkle.className = 'sparkle';
-    sparkle.style.cssText = `left:${Math.random() * 100}%;top:${Math.random() * 100}%`;
-    container.appendChild(sparkle);
-    setTimeout(() => sparkle.remove(), 1000);
+    // Skip mouse move tracking - too expensive for minimal visual benefit
+    // Sparkle effects completely disabled - reduces DOM operations
 }
 
 // Initialize section animations after DOM ready
 document.addEventListener('DOMContentLoaded', () => {
-    requestIdleCallback ? requestIdleCallback(initSectionAnimations) : setTimeout(initSectionAnimations, 100);
+    requestIdleCallback ? requestIdleCallback(initSectionAnimations, { timeout: 2000 }) : setTimeout(initSectionAnimations, 150);
 });
 
 // ===========================
@@ -443,17 +418,10 @@ function initNavigation() {
     const navLinks = document.getElementById('nav-links');
     const allNavLinks = document.querySelectorAll('.nav-link');
 
-    // Scroll effect (throttled)
-    let lastScrollTop = 0;
-    const handleScroll = throttle(() => {
-        const scrollTop = window.scrollY;
-        if (scrollTop > 60) {
-            navbar.classList.add('scrolled');
-        } else {
-            navbar.classList.remove('scrolled');
-        }
-        lastScrollTop = scrollTop;
-    }, 16);
+    // Scroll effect (RAF throttled for smooth 60fps)
+    const handleScroll = rafThrottle(() => {
+        navbar.classList.toggle('scrolled', window.scrollY > 60);
+    });
     
     window.addEventListener('scroll', handleScroll, { passive: true });
 
@@ -462,7 +430,7 @@ function initNavigation() {
         navLinks.classList.toggle('open');
     });
 
-    // Active section tracking (using IntersectionObserver instead of scroll)
+    // Active section tracking (using IntersectionObserver - much more efficient)
     const sections = document.querySelectorAll('section[id]');
     const observerOptions = { rootMargin: '-20% 0px -70% 0px' };
 
@@ -492,39 +460,35 @@ function initScrollAnimations() {
         '.pipeline-stage, .kpi-card, .chart-card, .v-summary-card, .config-group'
     );
 
+    // Batch reveal elements without setTimeout delays
     const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry, i) => {
+        entries.forEach((entry) => {
             if (entry.isIntersecting) {
-                setTimeout(() => {
-                    entry.target.classList.add('visible');
-                }, i * 50); // Faster stagger animation
+                entry.target.classList.add('visible');
                 observer.unobserve(entry.target);
             }
         });
-    }, { threshold: 0.12 }); // Lower threshold for earlier trigger
+    }, { threshold: 0.1, rootMargin: '50px' });
 
     animateElements.forEach(el => observer.observe(el));
 
-    // Add subtle parallax effect to hero background
+    // Simplified parallax - only when hero is visible
     const heroSection = document.querySelector('.hero');
     const heroBg = document.querySelector('.hero-bg-image');
     
     if (heroSection && heroBg) {
-        let ticking = false;
-        window.addEventListener('scroll', () => {
-            if (!ticking) {
-                window.requestAnimationFrame(() => {
-                    const scrolled = window.pageYOffset;
-                    const heroBottom = heroSection.offsetHeight;
-                    if (scrolled < heroBottom) {
-                        const parallaxSpeed = scrolled * 0.4;
-                        heroBg.style.transform = `translateY(${parallaxSpeed}px) scale(1.1)`;
+        const parallaxObserver = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) {
+                const updateParallax = rafThrottle(() => {
+                    const scrolled = window.scrollY;
+                    if (scrolled < heroSection.offsetHeight) {
+                        heroBg.style.transform = `translateY(${scrolled * 0.3}px) scale(1.1)`;
                     }
-                    ticking = false;
                 });
-                ticking = true;
+                window.addEventListener('scroll', updateParallax, { passive: true });
             }
-        });
+        }, { threshold: 0 });
+        parallaxObserver.observe(heroSection);
     }
 }
 
@@ -540,14 +504,14 @@ function initCountUpAnimations() {
                 const el = entry.target;
                 const target = parseFloat(el.dataset.count);
                 const isDecimal = target % 1 !== 0;
-                const duration = 1200; // Faster counter animation
+                const duration = 800; // Even faster counter animation
                 const startTime = performance.now();
 
                 function update(now) {
                     const elapsed = now - startTime;
                     const progress = Math.min(elapsed / duration, 1);
-                    // Snappier ease out quad
-                    const eased = 1 - Math.pow(1 - progress, 2);
+                    // Ultra snappy ease out
+                    const eased = 1 - Math.pow(1 - progress, 3);
                     const current = eased * target;
 
                     if (isDecimal) {
@@ -580,9 +544,18 @@ function initCountUpAnimations() {
 // CHARTS
 // ===========================
 function initCharts() {
+    // Check if chart elements exist before initializing
+    if (!document.getElementById('chart-accuracy')) return;
+    
     Chart.defaults.color = '#8892a8';
     Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
     Chart.defaults.font.family = "'Inter', sans-serif";
+    
+    // Disable animations for better performance
+    Chart.defaults.animation = {
+        duration: 400,
+        easing: 'easeOutQuart'
+    };
 
     createAccuracyChart();
     createClassChart();
@@ -885,24 +858,29 @@ function generateViolationData() {
 }
 
 function initViolationTable() {
+    const searchInput = document.getElementById('violation-search');
+    const severityFilter = document.getElementById('severity-filter');
+    if (!searchInput || !severityFilter) return;
+    
     renderTable();
     
-    document.getElementById('violation-search').addEventListener('input', (e) => {
-        const q = e.target.value.toLowerCase();
-        filteredData = VIOLATION_DATA.filter(d =>
-            d.track_id.toString().includes(q) || d.video.toLowerCase().includes(q)
-        );
-        currentPage = 1;
-        renderTable();
+    // Debounce search input for better performance
+    let searchTimeout;
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            const q = e.target.value.toLowerCase();
+            filteredData = VIOLATION_DATA.filter(d =>
+                d.track_id.toString().includes(q) || d.video.toLowerCase().includes(q)
+            );
+            currentPage = 1;
+            renderTable();
+        }, 150);
     });
 
-    document.getElementById('severity-filter').addEventListener('change', (e) => {
+    severityFilter.addEventListener('change', (e) => {
         const val = e.target.value;
-        if (val === 'all') {
-            filteredData = [...VIOLATION_DATA];
-        } else {
-            filteredData = VIOLATION_DATA.filter(d => d.severity === val);
-        }
+        filteredData = val === 'all' ? [...VIOLATION_DATA] : VIOLATION_DATA.filter(d => d.severity === val);
         currentPage = 1;
         renderTable();
     });
@@ -911,13 +889,17 @@ function initViolationTable() {
 function renderTable() {
     const tbody = document.getElementById('violations-tbody');
     const pagEl = document.getElementById('table-pagination');
+    if (!tbody || !pagEl) return;
 
     const totalPages = Math.ceil(filteredData.length / rowsPerPage);
     const start = (currentPage - 1) * rowsPerPage;
     const pageData = filteredData.slice(start, start + rowsPerPage);
 
-    tbody.innerHTML = pageData.map(d => `
-        <tr>
+    // Use document fragment for better performance
+    const fragment = document.createDocumentFragment();
+    pageData.forEach(d => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
             <td>#${d.track_id}</td>
             <td>${d.video}</td>
             <td>${d.frame}</td>
@@ -926,34 +908,33 @@ function renderTable() {
             <td>+${d.excess}</td>
             <td>${d.confidence}</td>
             <td><span class="severity-badge severity-${d.severity}">${d.severity}</span></td>
-        </tr>
-    `).join('');
+        `;
+        fragment.appendChild(tr);
+    });
+    tbody.innerHTML = '';
+    tbody.appendChild(fragment);
 
-    // Pagination
-    let pagHTML = '';
+    // Pagination with event delegation
     const maxVisible = 5;
     let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
     let endPage = Math.min(totalPages, startPage + maxVisible - 1);
     if (endPage - startPage < maxVisible - 1) startPage = Math.max(1, endPage - maxVisible + 1);
 
-    if (currentPage > 1) {
-        pagHTML += `<button class="page-btn" data-page="${currentPage - 1}">‹</button>`;
-    }
+    let pagHTML = currentPage > 1 ? `<button class="page-btn" data-page="${currentPage - 1}">‹</button>` : '';
     for (let p = startPage; p <= endPage; p++) {
         pagHTML += `<button class="page-btn ${p === currentPage ? 'active' : ''}" data-page="${p}">${p}</button>`;
     }
-    if (currentPage < totalPages) {
-        pagHTML += `<button class="page-btn" data-page="${currentPage + 1}">›</button>`;
-    }
+    if (currentPage < totalPages) pagHTML += `<button class="page-btn" data-page="${currentPage + 1}">›</button>`;
 
     pagEl.innerHTML = pagHTML;
-
-    pagEl.querySelectorAll('.page-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            currentPage = parseInt(btn.dataset.page);
+    
+    // Single event listener with delegation
+    pagEl.onclick = (e) => {
+        if (e.target.classList.contains('page-btn')) {
+            currentPage = parseInt(e.target.dataset.page);
             renderTable();
-        });
-    });
+        }
+    };
 }
 
 // ===========================
