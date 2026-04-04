@@ -598,14 +598,20 @@ function createAccuracyChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: 'rgba(10,14,26,0.9)',
-                    borderColor: 'rgba(59, 130, 246, 0.3)',
+                    enabled: true,
+                    backgroundColor: 'rgba(10,14,26,0.95)',
+                    borderColor: 'rgba(59, 130, 246, 0.5)',
                     borderWidth: 1,
                     padding: 12,
                     cornerRadius: 8,
+                    titleFont: { size: 13, weight: '600' },
+                    bodyFont: { size: 12 },
+                    displayColors: true,
+                    boxPadding: 6,
                 }
             },
             scales: {
@@ -659,11 +665,16 @@ function createClassChart() {
                     }
                 },
                 tooltip: {
-                    backgroundColor: 'rgba(10,14,26,0.9)',
-                    borderColor: 'rgba(59, 130, 246, 0.3)',
+                    enabled: true,
+                    backgroundColor: 'rgba(10,14,26,0.95)',
+                    borderColor: 'rgba(59, 130, 246, 0.5)',
                     borderWidth: 1,
                     padding: 12,
                     cornerRadius: 8,
+                    titleFont: { size: 13, weight: '600' },
+                    bodyFont: { size: 12 },
+                    displayColors: true,
+                    boxPadding: 6,
                     callbacks: {
                         label: (ctx) => {
                             const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
@@ -703,14 +714,24 @@ function createSpeedChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: 'rgba(10,14,26,0.9)',
-                    borderColor: 'rgba(6, 182, 212, 0.3)',
+                    enabled: true,
+                    backgroundColor: 'rgba(10,14,26,0.95)',
+                    borderColor: 'rgba(6, 182, 212, 0.5)',
                     borderWidth: 1,
                     padding: 12,
                     cornerRadius: 8,
+                    titleFont: { size: 13, weight: '600' },
+                    bodyFont: { size: 12 },
+                    displayColors: true,
+                    boxPadding: 6,
+                    callbacks: {
+                        title: (items) => `Speed: ${items[0].label} km/h`,
+                        label: (ctx) => ` Vehicles: ${ctx.parsed.y.toLocaleString()}`
+                    }
                 }
             },
             scales: {
@@ -786,11 +807,23 @@ function createProcessingChart() {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: 'rgba(10,14,26,0.9)',
-                    borderColor: 'rgba(139, 92, 246, 0.3)',
+                    enabled: true,
+                    backgroundColor: 'rgba(10,14,26,0.95)',
+                    borderColor: 'rgba(139, 92, 246, 0.5)',
                     borderWidth: 1,
                     padding: 12,
                     cornerRadius: 8,
+                    titleFont: { size: 13, weight: '600' },
+                    bodyFont: { size: 12 },
+                    displayColors: true,
+                    boxPadding: 6,
+                    callbacks: {
+                        label: (ctx) => {
+                            const label = ctx.dataset.label;
+                            const value = ctx.parsed.y;
+                            return ` ${label}: ${value.toLocaleString()}`;
+                        }
+                    }
                 }
             },
             scales: {
@@ -1888,9 +1921,11 @@ async function fetchAndApplyResults() {
     try {
         const res  = await fetch(`${API_BASE}/api/results`);
         const data = await res.json();
+        console.log('Results data received:', data); // Debug logging
         if (!res.ok) { rpLog(`Results error: ${data.error}`, 'danger'); setProgressBadge('error'); return; }
         applyRealResults(data);
     } catch (err) {
+        console.error('Fetch results error:', err);
         rpLog(`Network error: ${err}`, 'danger');
     }
 }
@@ -1953,7 +1988,8 @@ function applyRealResults(data) {
         if (el('v-rate'))      el('v-rate').textContent      = summary.violation_rate;
     }
 
-    // Charts
+    // Charts - log what we're about to update
+    console.log('Chart data received:', charts);
     if (charts.accuracy)           updateAccuracyChartReal(charts.accuracy);
     if (charts.classes)            updateClassChartReal(charts.classes);
     if (charts.speed_distribution) updateSpeedChartReal(charts.speed_distribution);
@@ -2021,7 +2057,8 @@ function showDatasetBadge(datasetPath) {
 // ── Chart Updaters ────────────────────────────────────────────
 function updateAccuracyChartReal(acc) {
     const c = Chart.getChart('chart-accuracy');
-    if (!c) return;
+    if (!c) { console.warn('Accuracy chart not found'); return; }
+    console.log('Updating accuracy chart with:', acc);
     c.data.labels = acc.labels;
     c.data.datasets[0].data = acc.detected;
     c.data.datasets[1].data = acc.detected.map(v => Math.round(v * 1.05));
@@ -2029,14 +2066,16 @@ function updateAccuracyChartReal(acc) {
 }
 function updateClassChartReal(cls) {
     const c = Chart.getChart('chart-classes');
-    if (!c) return;
+    if (!c) { console.warn('Classes chart not found'); return; }
+    console.log('Updating class chart with:', cls);
     c.data.labels = cls.labels.map(l => l.charAt(0).toUpperCase() + l.slice(1));
     c.data.datasets[0].data = cls.data;
     c.update('active');
 }
 function updateSpeedChartReal(spd) {
     const c = Chart.getChart('chart-speed');
-    if (!c) return;
+    if (!c) { console.warn('Speed chart not found'); return; }
+    console.log('Updating speed chart with:', spd);
     const limit = parseInt(document.getElementById('cfg-speed')?.value || 50);
     const colors = spd.labels.map(l => parseInt(l.split(/[–-]/)[0], 10) >= limit
         ? 'rgba(239,68,68,0.7)' : 'rgba(6,182,212,0.6)');
@@ -2048,7 +2087,8 @@ function updateSpeedChartReal(spd) {
 }
 function updateProcessingChartReal(proc) {
     const c = Chart.getChart('chart-processing');
-    if (!c) return;
+    if (!c) { console.warn('Processing chart not found'); return; }
+    console.log('Updating processing chart with:', proc);
     c.data.labels = proc.labels;
     c.data.datasets[0].data = proc.time;
     c.data.datasets[1].data = proc.frames;
@@ -2129,12 +2169,18 @@ function goToPerVideoPage(page) {
 // ── Tiny helpers ─────────────────────────────────────────────
 function setKPICardVal(id, value, suffix = '') {
     const card = document.getElementById(id);
-    if (!card) return;
+    if (!card) {
+        console.warn(`KPI card not found: ${id}`);
+        return;
+    }
     const valEl = card.querySelector('.kpi-value');
     const suffixEl = card.querySelector('.kpi-suffix');
     if (valEl) {
-        // Only set value, not suffix (suffix is already in HTML or passed separately)
+        // Remove data-count to prevent count-up animation from overwriting
+        valEl.removeAttribute('data-count');
+        // Set the value directly
         valEl.textContent = value ?? '—';
+        console.log(`Updated ${id}:`, value);
     }
     // Update suffix element if it exists and suffix is provided
     if (suffixEl && suffix) {
