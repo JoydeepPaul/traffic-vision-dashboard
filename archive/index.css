@@ -270,14 +270,15 @@ input, select {
     position: absolute;
     inset: 0;
     z-index: 0;
+    overflow: hidden;
 }
 
 .hero-bg-image {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    opacity: 0.35;
-    filter: saturate(0.7);
+    opacity: 0.25;
+    filter: saturate(0.6) brightness(0.8);
     transform: scale(1.1);
     transition: transform 0.1s linear;
     will-change: transform;
@@ -286,17 +287,23 @@ input, select {
 .hero-overlay {
     position: absolute;
     inset: 0;
-    background: var(--gradient-hero);
+    background: 
+        radial-gradient(ellipse at 50% 0%, rgba(6, 182, 212, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 50%, rgba(139, 92, 246, 0.05) 0%, transparent 40%),
+        radial-gradient(ellipse at 20% 80%, rgba(59, 130, 246, 0.06) 0%, transparent 40%),
+        var(--gradient-hero);
 }
 
 .hero-grid-lines {
     position: absolute;
     inset: 0;
     background-image:
-        linear-gradient(rgba(59, 130, 246, 0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(59, 130, 246, 0.04) 1px, transparent 1px);
+        linear-gradient(rgba(59, 130, 246, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59, 130, 246, 0.05) 1px, transparent 1px);
     background-size: 60px 60px;
     animation: gridPulse 5s ease-in-out infinite;
+    mask-image: radial-gradient(ellipse at center, black 0%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 0%, transparent 75%);
 }
 
 @keyframes gridPulse {
@@ -304,13 +311,293 @@ input, select {
     50% { opacity: 0.7; }
 }
 
+/* ============ ANIMATED TRAFFIC BACKGROUND ============ */
+.traffic-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.8;
+}
+
+/* Animated Flow Lines (representing traffic paths) */
+.traffic-flow-lines {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.flow-line {
+    position: absolute;
+    height: 2px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(6, 182, 212, 0.1) 20%,
+        rgba(59, 130, 246, 0.4) 50%,
+        rgba(6, 182, 212, 0.1) 80%,
+        transparent 100%
+    );
+    filter: blur(0.5px);
+    animation: flowLineMove 8s linear infinite;
+}
+
+.flow-line-1 {
+    top: 20%;
+    left: -50%;
+    width: 200%;
+    animation-duration: 12s;
+    animation-delay: 0s;
+}
+
+.flow-line-2 {
+    top: 45%;
+    left: -50%;
+    width: 200%;
+    height: 3px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(139, 92, 246, 0.1) 20%,
+        rgba(139, 92, 246, 0.5) 50%,
+        rgba(139, 92, 246, 0.1) 80%,
+        transparent 100%
+    );
+    animation-duration: 10s;
+    animation-delay: 2s;
+}
+
+.flow-line-3 {
+    top: 70%;
+    left: -50%;
+    width: 200%;
+    animation-duration: 14s;
+    animation-delay: 4s;
+}
+
+.flow-line-4 {
+    top: 85%;
+    left: -50%;
+    width: 200%;
+    height: 1px;
+    animation-duration: 9s;
+    animation-delay: 1s;
+}
+
+@keyframes flowLineMove {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(50%); }
+}
+
+/* Radar Sweep Effect */
+.radar-sweep {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 600px;
+    height: 600px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        rgba(6, 182, 212, 0.08) 30deg,
+        rgba(59, 130, 246, 0.12) 60deg,
+        transparent 90deg
+    );
+    animation: radarSweep 6s linear infinite;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.6;
+}
+
+@keyframes radarSweep {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Pulse Rings (detection points) */
+.pulse-rings {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.pulse-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    animation: pulseRingExpand 4s ease-out infinite;
+}
+
+.pulse-ring-1 {
+    top: 25%;
+    left: 20%;
+    width: 100px;
+    height: 100px;
+    animation-delay: 0s;
+}
+
+.pulse-ring-2 {
+    top: 60%;
+    right: 25%;
+    width: 80px;
+    height: 80px;
+    animation-delay: 1.5s;
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+.pulse-ring-3 {
+    bottom: 30%;
+    left: 35%;
+    width: 120px;
+    height: 120px;
+    animation-delay: 3s;
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+@keyframes pulseRingExpand {
+    0% {
+        transform: scale(0.5);
+        opacity: 0.8;
+    }
+    50% {
+        opacity: 0.4;
+    }
+    100% {
+        transform: scale(2.5);
+        opacity: 0;
+    }
+}
+
+/* Floating Particles Container */
+.hero-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: 
+        radial-gradient(circle at 20% 30%, rgba(6, 182, 212, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
+        radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.04) 0%, transparent 70%);
+    animation: gradientFloat 15s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+}
+
+@keyframes gradientFloat {
+    0%, 100% {
+        background-position: 0% 0%, 100% 100%, 50% 50%;
+        opacity: 0.8;
+    }
+    33% {
+        background-position: 30% 50%, 70% 30%, 50% 80%;
+        opacity: 1;
+    }
+    66% {
+        background-position: 70% 30%, 30% 70%, 80% 20%;
+        opacity: 0.9;
+    }
+}
+
+/* Scanning Line Effect */
+.hero-bg::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, 
+        transparent 0%,
+        rgba(6, 182, 212, 0.2) 20%,
+        rgba(6, 182, 212, 0.6) 50%,
+        rgba(6, 182, 212, 0.2) 80%,
+        transparent 100%
+    );
+    animation: scanLine 4s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 2;
+    filter: blur(1px);
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+}
+
+@keyframes scanLine {
+    0% { top: 0%; opacity: 0; }
+    5% { opacity: 1; }
+    95% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+}
+
+/* Data Stream Lines */
+.hero-grid-lines::before,
+.hero-grid-lines::after {
+    content: '';
+    position: absolute;
+    background: linear-gradient(180deg, 
+        transparent 0%,
+        rgba(59, 130, 246, 0.15) 50%,
+        transparent 100%
+    );
+    width: 1px;
+    height: 100%;
+    animation: dataStream 3s linear infinite;
+}
+
+.hero-grid-lines::before {
+    left: 25%;
+    animation-delay: 0s;
+}
+
+.hero-grid-lines::after {
+    right: 30%;
+    animation-delay: 1.5s;
+    background: linear-gradient(180deg, 
+        transparent 0%,
+        rgba(139, 92, 246, 0.15) 50%,
+        transparent 100%
+    );
+}
+
+@keyframes dataStream {
+    0% { 
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { 
+        transform: translateY(100%);
+        opacity: 0;
+    }
+}
+
 .hero-content {
     position: relative;
-    z-index: 1;
+    z-index: 10;
     text-align: center;
     max-width: 900px;
     padding: 0 var(--container-padding);
     animation: heroFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Add subtle glow backdrop behind hero content for better readability */
+.hero-content::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 120%;
+    height: 120%;
+    background: radial-gradient(ellipse at center, 
+        rgba(10, 14, 26, 0.6) 0%, 
+        rgba(10, 14, 26, 0.3) 40%,
+        transparent 70%
+    );
+    pointer-events: none;
+    z-index: -1;
 }
 
 @keyframes heroFadeIn {
@@ -2161,4 +2448,108 @@ input, select {
     border-radius:100px; font-size:0.72rem; font-weight:700;
     color:var(--accent-green); text-transform:uppercase; letter-spacing:0.8px;
     margin-left:12px; vertical-align:middle;
+}
+
+/* ===========================
+   ANIMATED BACKGROUND - RESPONSIVE
+   =========================== */
+
+/* Tablet and smaller - reduce visual complexity */
+@media (max-width: 1024px) {
+    .radar-sweep {
+        width: 400px;
+        height: 400px;
+    }
+    
+    .pulse-ring-3 {
+        display: none;
+    }
+    
+    .flow-line-4 {
+        display: none;
+    }
+}
+
+/* Mobile - minimal animation for performance */
+@media (max-width: 768px) {
+    .radar-sweep {
+        width: 300px;
+        height: 300px;
+        opacity: 0.4;
+    }
+    
+    .pulse-ring-2,
+    .pulse-ring-3 {
+        display: none;
+    }
+    
+    .flow-line-2,
+    .flow-line-3,
+    .flow-line-4 {
+        display: none;
+    }
+    
+    .traffic-canvas {
+        opacity: 0.5;
+    }
+    
+    .hero-grid-lines::before,
+    .hero-grid-lines::after {
+        display: none;
+    }
+    
+    .hero-bg::after {
+        animation-duration: 6s;
+    }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+    .radar-sweep,
+    .pulse-rings,
+    .traffic-flow-lines {
+        display: none;
+    }
+    
+    .traffic-canvas {
+        opacity: 0.3;
+    }
+}
+
+/* ===========================
+   REDUCED MOTION PREFERENCES
+   =========================== */
+@media (prefers-reduced-motion: reduce) {
+    .traffic-canvas,
+    .radar-sweep,
+    .pulse-rings,
+    .traffic-flow-lines {
+        display: none !important;
+    }
+    
+    .hero-bg::before,
+    .hero-bg::after,
+    .hero-grid-lines::before,
+    .hero-grid-lines::after {
+        animation: none !important;
+    }
+    
+    .flow-line,
+    .pulse-ring {
+        animation: none !important;
+    }
+    
+    .hero-grid-lines {
+        animation: none !important;
+        opacity: 0.5;
+    }
+    
+    .badge-dot {
+        animation: none !important;
+    }
+    
+    @keyframes heroFadeIn {
+        from { opacity: 1; transform: none; }
+        to { opacity: 1; transform: none; }
+    }
 }

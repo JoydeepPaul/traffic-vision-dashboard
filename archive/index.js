@@ -10,7 +10,311 @@ document.addEventListener('DOMContentLoaded', () => {
     initViolationTable();
     initConfigPanel();
     initDemoSimulation();
+    initTrafficAnimation();
 });
+
+// ===========================
+// ANIMATED TRAFFIC BACKGROUND
+// ===========================
+function initTrafficAnimation() {
+    const canvas = document.getElementById('traffic-canvas');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    let animationId;
+    let particles = [];
+    let vehicles = [];
+    let detectionPoints = [];
+    let connectionLines = [];
+    
+    // Resize canvas to fill container
+    function resizeCanvas() {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        canvas.style.width = rect.width + 'px';
+        canvas.style.height = rect.height + 'px';
+        ctx.scale(dpr, dpr);
+        
+        // Reinitialize particles on resize
+        initParticles();
+        initVehicles();
+        initDetectionPoints();
+    }
+    
+    // Initialize floating particles
+    function initParticles() {
+        const rect = canvas.getBoundingClientRect();
+        particles = [];
+        const count = Math.floor((rect.width * rect.height) / 15000);
+        
+        for (let i = 0; i < count; i++) {
+            particles.push({
+                x: Math.random() * rect.width,
+                y: Math.random() * rect.height,
+                size: Math.random() * 2 + 0.5,
+                speedX: (Math.random() - 0.5) * 0.3,
+                speedY: (Math.random() - 0.5) * 0.3,
+                opacity: Math.random() * 0.5 + 0.2,
+                color: ['#06b6d4', '#3b82f6', '#8b5cf6'][Math.floor(Math.random() * 3)]
+            });
+        }
+    }
+    
+    // Initialize moving vehicles (represented as glowing rectangles)
+    function initVehicles() {
+        const rect = canvas.getBoundingClientRect();
+        vehicles = [];
+        const vehicleCount = 6;
+        
+        for (let i = 0; i < vehicleCount; i++) {
+            const direction = Math.random() > 0.5 ? 1 : -1;
+            vehicles.push({
+                x: Math.random() * rect.width,
+                y: rect.height * 0.3 + Math.random() * rect.height * 0.5,
+                width: 15 + Math.random() * 10,
+                height: 8 + Math.random() * 4,
+                speed: (1 + Math.random() * 2) * direction,
+                color: ['#06b6d4', '#3b82f6', '#10b981', '#f59e0b'][Math.floor(Math.random() * 4)],
+                trail: []
+            });
+        }
+    }
+    
+    // Initialize detection points (like radar blips)
+    function initDetectionPoints() {
+        const rect = canvas.getBoundingClientRect();
+        detectionPoints = [];
+        const count = 5;
+        
+        for (let i = 0; i < count; i++) {
+            detectionPoints.push({
+                x: rect.width * 0.15 + Math.random() * rect.width * 0.7,
+                y: rect.height * 0.2 + Math.random() * rect.height * 0.6,
+                radius: 3,
+                maxRadius: 30 + Math.random() * 20,
+                pulseRadius: 0,
+                speed: 0.5 + Math.random() * 0.5,
+                color: ['#06b6d4', '#3b82f6', '#8b5cf6'][Math.floor(Math.random() * 3)]
+            });
+        }
+    }
+    
+    // Draw particles
+    function drawParticles() {
+        const rect = canvas.getBoundingClientRect();
+        
+        particles.forEach(p => {
+            // Update position
+            p.x += p.speedX;
+            p.y += p.speedY;
+            
+            // Wrap around edges
+            if (p.x < 0) p.x = rect.width;
+            if (p.x > rect.width) p.x = 0;
+            if (p.y < 0) p.y = rect.height;
+            if (p.y > rect.height) p.y = 0;
+            
+            // Draw particle
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = p.opacity;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        });
+    }
+    
+    // Draw connection lines between nearby particles
+    function drawConnections() {
+        const maxDist = 120;
+        
+        for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < particles.length; j++) {
+                const dx = particles[i].x - particles[j].x;
+                const dy = particles[i].y - particles[j].y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist < maxDist) {
+                    const opacity = (1 - dist / maxDist) * 0.15;
+                    ctx.beginPath();
+                    ctx.moveTo(particles[i].x, particles[i].y);
+                    ctx.lineTo(particles[j].x, particles[j].y);
+                    ctx.strokeStyle = `rgba(59, 130, 246, ${opacity})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                }
+            }
+        }
+    }
+    
+    // Draw vehicles with trails
+    function drawVehicles() {
+        const rect = canvas.getBoundingClientRect();
+        
+        vehicles.forEach(v => {
+            // Store trail position
+            v.trail.push({ x: v.x, y: v.y });
+            if (v.trail.length > 20) v.trail.shift();
+            
+            // Update position
+            v.x += v.speed;
+            
+            // Wrap around
+            if (v.x > rect.width + 50) v.x = -50;
+            if (v.x < -50) v.x = rect.width + 50;
+            
+            // Draw trail
+            v.trail.forEach((t, i) => {
+                const trailOpacity = (i / v.trail.length) * 0.3;
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = v.color;
+                ctx.globalAlpha = trailOpacity;
+                ctx.fill();
+            });
+            
+            // Draw vehicle glow
+            ctx.globalAlpha = 0.3;
+            ctx.shadowColor = v.color;
+            ctx.shadowBlur = 15;
+            ctx.fillStyle = v.color;
+            ctx.fillRect(v.x - v.width/2, v.y - v.height/2, v.width, v.height);
+            
+            // Draw vehicle body
+            ctx.globalAlpha = 0.8;
+            ctx.shadowBlur = 5;
+            ctx.fillRect(v.x - v.width/2 + 2, v.y - v.height/2 + 1, v.width - 4, v.height - 2);
+            
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+        });
+    }
+    
+    // Draw detection points with pulsing effect
+    function drawDetectionPoints() {
+        detectionPoints.forEach(d => {
+            // Update pulse
+            d.pulseRadius += d.speed;
+            if (d.pulseRadius > d.maxRadius) d.pulseRadius = 0;
+            
+            // Draw pulse ring
+            const pulseOpacity = 1 - (d.pulseRadius / d.maxRadius);
+            ctx.beginPath();
+            ctx.arc(d.x, d.y, d.pulseRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = d.color;
+            ctx.globalAlpha = pulseOpacity * 0.4;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            
+            // Draw center point
+            ctx.beginPath();
+            ctx.arc(d.x, d.y, d.radius, 0, Math.PI * 2);
+            ctx.fillStyle = d.color;
+            ctx.globalAlpha = 0.8;
+            ctx.shadowColor = d.color;
+            ctx.shadowBlur = 10;
+            ctx.fill();
+            
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+        });
+    }
+    
+    // Draw targeting brackets (like HUD elements)
+    function drawTargetingBrackets() {
+        const rect = canvas.getBoundingClientRect();
+        const time = Date.now() * 0.001;
+        
+        // Draw some tracking brackets around random positions
+        const positions = [
+            { x: rect.width * 0.25, y: rect.height * 0.35 },
+            { x: rect.width * 0.65, y: rect.height * 0.55 },
+            { x: rect.width * 0.45, y: rect.height * 0.75 }
+        ];
+        
+        positions.forEach((pos, i) => {
+            const pulse = Math.sin(time * 2 + i) * 0.3 + 0.7;
+            const size = 25;
+            const offset = 8;
+            
+            ctx.strokeStyle = '#06b6d4';
+            ctx.globalAlpha = 0.4 * pulse;
+            ctx.lineWidth = 1.5;
+            
+            // Top-left bracket
+            ctx.beginPath();
+            ctx.moveTo(pos.x - size, pos.y - size + offset);
+            ctx.lineTo(pos.x - size, pos.y - size);
+            ctx.lineTo(pos.x - size + offset, pos.y - size);
+            ctx.stroke();
+            
+            // Top-right bracket
+            ctx.beginPath();
+            ctx.moveTo(pos.x + size - offset, pos.y - size);
+            ctx.lineTo(pos.x + size, pos.y - size);
+            ctx.lineTo(pos.x + size, pos.y - size + offset);
+            ctx.stroke();
+            
+            // Bottom-left bracket
+            ctx.beginPath();
+            ctx.moveTo(pos.x - size, pos.y + size - offset);
+            ctx.lineTo(pos.x - size, pos.y + size);
+            ctx.lineTo(pos.x - size + offset, pos.y + size);
+            ctx.stroke();
+            
+            // Bottom-right bracket
+            ctx.beginPath();
+            ctx.moveTo(pos.x + size - offset, pos.y + size);
+            ctx.lineTo(pos.x + size, pos.y + size);
+            ctx.lineTo(pos.x + size, pos.y + size - offset);
+            ctx.stroke();
+            
+            ctx.globalAlpha = 1;
+        });
+    }
+    
+    // Main animation loop
+    function animate() {
+        const rect = canvas.getBoundingClientRect();
+        ctx.clearRect(0, 0, rect.width, rect.height);
+        
+        drawConnections();
+        drawParticles();
+        drawVehicles();
+        drawDetectionPoints();
+        drawTargetingBrackets();
+        
+        animationId = requestAnimationFrame(animate);
+    }
+    
+    // Initialize
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    animate();
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        cancelAnimationFrame(animationId);
+    });
+    
+    // Reduce animation when hero section not visible (performance)
+    const heroSection = document.getElementById('hero');
+    if (heroSection) {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    if (!animationId) animate();
+                } else {
+                    cancelAnimationFrame(animationId);
+                    animationId = null;
+                }
+            });
+        }, { threshold: 0.1 });
+        observer.observe(heroSection);
+    }
+}
 
 // ===========================
 // NAVIGATION
