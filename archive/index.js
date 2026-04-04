@@ -2,15 +2,58 @@
    TRAFFICVISION AI — Interactive JavaScript
    ============================================ */
 
+// Performance utilities
+const throttle = (fn, ms) => {
+    let lastCall = 0;
+    return (...args) => {
+        const now = Date.now();
+        if (now - lastCall >= ms) {
+            lastCall = now;
+            fn(...args);
+        }
+    };
+};
+
+const debounce = (fn, ms) => {
+    let timeout;
+    return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => fn(...args), ms);
+    };
+};
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Defer non-critical initialization
     initNavigation();
     initScrollAnimations();
-    initCountUpAnimations();
-    initCharts();
-    initViolationTable();
-    initConfigPanel();
-    initDemoSimulation();
-    initTrafficAnimation();
+    
+    // Use requestIdleCallback for non-critical tasks
+    if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => {
+            initCountUpAnimations();
+            initCharts();
+            initViolationTable();
+            initConfigPanel();
+        }, { timeout: 2000 });
+        
+        requestIdleCallback(() => {
+            initDemoSimulation();
+            initTrafficAnimation();
+        }, { timeout: 3000 });
+    } else {
+        // Fallback for browsers without requestIdleCallback
+        setTimeout(() => {
+            initCountUpAnimations();
+            initCharts();
+            initViolationTable();
+            initConfigPanel();
+        }, 100);
+        
+        setTimeout(() => {
+            initDemoSimulation();
+            initTrafficAnimation();
+        }, 200);
+    }
 });
 
 // ===========================
@@ -20,16 +63,22 @@ function initTrafficAnimation() {
     const canvas = document.getElementById('traffic-canvas');
     if (!canvas) return;
     
-    const ctx = canvas.getContext('2d');
+    // Check for reduced motion preference
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    
+    const ctx = canvas.getContext('2d', { alpha: true });
     let animationId;
     let particles = [];
     let vehicles = [];
     let detectionPoints = [];
-    let connectionLines = [];
+    let isVisible = true;
+    let lastFrameTime = 0;
+    const targetFPS = 30; // Limit to 30 FPS for smoother performance
+    const frameInterval = 1000 / targetFPS;
     
-    // Resize canvas to fill container
-    function resizeCanvas() {
-        const dpr = window.devicePixelRatio || 1;
+    // Resize canvas to fill container (debounced)
+    const resizeCanvas = debounce(() => {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2); // Cap at 2x for performance
         const rect = canvas.parentElement.getBoundingClientRect();
         canvas.width = rect.width * dpr;
         canvas.height = rect.height * dpr;
@@ -37,36 +86,35 @@ function initTrafficAnimation() {
         canvas.style.height = rect.height + 'px';
         ctx.scale(dpr, dpr);
         
-        // Reinitialize particles on resize
         initParticles();
         initVehicles();
         initDetectionPoints();
-    }
+    }, 150);
     
-    // Initialize floating particles
+    // Initialize floating particles (reduced count)
     function initParticles() {
         const rect = canvas.getBoundingClientRect();
         particles = [];
-        const count = Math.floor((rect.width * rect.height) / 15000);
+        const count = Math.min(Math.floor((rect.width * rect.height) / 25000), 30); // Reduced count
         
         for (let i = 0; i < count; i++) {
             particles.push({
                 x: Math.random() * rect.width,
                 y: Math.random() * rect.height,
                 size: Math.random() * 2 + 0.5,
-                speedX: (Math.random() - 0.5) * 0.3,
-                speedY: (Math.random() - 0.5) * 0.3,
-                opacity: Math.random() * 0.5 + 0.2,
+                speedX: (Math.random() - 0.5) * 0.2,
+                speedY: (Math.random() - 0.5) * 0.2,
+                opacity: Math.random() * 0.4 + 0.2,
                 color: ['#06b6d4', '#3b82f6', '#8b5cf6'][Math.floor(Math.random() * 3)]
             });
         }
     }
     
-    // Initialize moving vehicles (represented as glowing rectangles)
+    // Initialize moving vehicles (reduced count)
     function initVehicles() {
         const rect = canvas.getBoundingClientRect();
         vehicles = [];
-        const vehicleCount = 6;
+        const vehicleCount = 4; // Reduced from 6
         
         for (let i = 0; i < vehicleCount; i++) {
             const direction = Math.random() > 0.5 ? 1 : -1;
@@ -101,234 +149,231 @@ function initTrafficAnimation() {
         }
     }
     
-    // Draw particles
+    // Draw particles (batch rendering)
     function drawParticles() {
         const rect = canvas.getBoundingClientRect();
+        const w = rect.width;
+        const h = rect.height;
         
+        ctx.save();
         particles.forEach(p => {
-            // Update position
             p.x += p.speedX;
             p.y += p.speedY;
             
-            // Wrap around edges
-            if (p.x < 0) p.x = rect.width;
-            if (p.x > rect.width) p.x = 0;
-            if (p.y < 0) p.y = rect.height;
-            if (p.y > rect.height) p.y = 0;
+            if (p.x < 0) p.x = w;
+            else if (p.x > w) p.x = 0;
+            if (p.y < 0) p.y = h;
+            else if (p.y > h) p.y = 0;
             
-            // Draw particle
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            ctx.fillStyle = p.color;
             ctx.globalAlpha = p.opacity;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, 6.28); // Use 6.28 instead of Math.PI * 2
             ctx.fill();
-            ctx.globalAlpha = 1;
         });
+        ctx.restore();
     }
     
-    // Draw connection lines between nearby particles
+    // Draw connection lines (optimized - skip distant pairs early)
     function drawConnections() {
-        const maxDist = 120;
+        const maxDist = 100; // Reduced from 120
+        const maxDistSq = maxDist * maxDist;
+        const len = particles.length;
         
-        for (let i = 0; i < particles.length; i++) {
-            for (let j = i + 1; j < particles.length; j++) {
-                const dx = particles[i].x - particles[j].x;
-                const dy = particles[i].y - particles[j].y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+        ctx.save();
+        ctx.lineWidth = 0.5;
+        
+        for (let i = 0; i < len; i++) {
+            const p1 = particles[i];
+            for (let j = i + 1; j < len; j++) {
+                const p2 = particles[j];
+                const dx = p1.x - p2.x;
+                const dy = p1.y - p2.y;
+                const distSq = dx * dx + dy * dy; // Skip sqrt for comparison
                 
-                if (dist < maxDist) {
-                    const opacity = (1 - dist / maxDist) * 0.15;
+                if (distSq < maxDistSq) {
+                    const opacity = (1 - Math.sqrt(distSq) / maxDist) * 0.12;
+                    ctx.globalAlpha = opacity;
+                    ctx.strokeStyle = '#3b82f6';
                     ctx.beginPath();
-                    ctx.moveTo(particles[i].x, particles[i].y);
-                    ctx.lineTo(particles[j].x, particles[j].y);
-                    ctx.strokeStyle = `rgba(59, 130, 246, ${opacity})`;
-                    ctx.lineWidth = 0.5;
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
                     ctx.stroke();
                 }
             }
         }
+        ctx.restore();
     }
     
-    // Draw vehicles with trails
+    // Draw vehicles with trails (optimized)
     function drawVehicles() {
         const rect = canvas.getBoundingClientRect();
+        const w = rect.width;
         
+        ctx.save();
         vehicles.forEach(v => {
-            // Store trail position
             v.trail.push({ x: v.x, y: v.y });
-            if (v.trail.length > 20) v.trail.shift();
+            if (v.trail.length > 10) v.trail.shift(); // Reduced trail length
             
-            // Update position
             v.x += v.speed;
             
-            // Wrap around
-            if (v.x > rect.width + 50) v.x = -50;
-            if (v.x < -50) v.x = rect.width + 50;
+            if (v.x > w + 50) v.x = -50;
+            else if (v.x < -50) v.x = w + 50;
             
-            // Draw trail
-            v.trail.forEach((t, i) => {
-                const trailOpacity = (i / v.trail.length) * 0.3;
-                ctx.beginPath();
-                ctx.arc(t.x, t.y, 2, 0, Math.PI * 2);
+            // Draw trail (simplified)
+            const trailLen = v.trail.length;
+            for (let i = 0; i < trailLen; i += 2) {
+                const t = v.trail[i];
+                ctx.globalAlpha = (i / trailLen) * 0.25;
                 ctx.fillStyle = v.color;
-                ctx.globalAlpha = trailOpacity;
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, 2, 0, 6.28);
                 ctx.fill();
-            });
+            }
             
-            // Draw vehicle glow
-            ctx.globalAlpha = 0.3;
-            ctx.shadowColor = v.color;
-            ctx.shadowBlur = 15;
+            // Draw vehicle (simplified - no shadow for performance)
+            ctx.globalAlpha = 0.6;
             ctx.fillStyle = v.color;
             ctx.fillRect(v.x - v.width/2, v.y - v.height/2, v.width, v.height);
-            
-            // Draw vehicle body
-            ctx.globalAlpha = 0.8;
-            ctx.shadowBlur = 5;
-            ctx.fillRect(v.x - v.width/2 + 2, v.y - v.height/2 + 1, v.width - 4, v.height - 2);
-            
-            ctx.shadowBlur = 0;
-            ctx.globalAlpha = 1;
         });
+        ctx.restore();
     }
     
-    // Draw detection points with pulsing effect
+    // Draw detection points (optimized)
     function drawDetectionPoints() {
+        ctx.save();
         detectionPoints.forEach(d => {
-            // Update pulse
             d.pulseRadius += d.speed;
             if (d.pulseRadius > d.maxRadius) d.pulseRadius = 0;
             
             // Draw pulse ring
             const pulseOpacity = 1 - (d.pulseRadius / d.maxRadius);
-            ctx.beginPath();
-            ctx.arc(d.x, d.y, d.pulseRadius, 0, Math.PI * 2);
+            ctx.globalAlpha = pulseOpacity * 0.3;
             ctx.strokeStyle = d.color;
-            ctx.globalAlpha = pulseOpacity * 0.4;
-            ctx.lineWidth = 1.5;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(d.x, d.y, d.pulseRadius, 0, 6.28);
             ctx.stroke();
             
             // Draw center point
-            ctx.beginPath();
-            ctx.arc(d.x, d.y, d.radius, 0, Math.PI * 2);
+            ctx.globalAlpha = 0.7;
             ctx.fillStyle = d.color;
-            ctx.globalAlpha = 0.8;
-            ctx.shadowColor = d.color;
-            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(d.x, d.y, d.radius, 0, 6.28);
             ctx.fill();
-            
-            ctx.shadowBlur = 0;
-            ctx.globalAlpha = 1;
         });
+        ctx.restore();
     }
     
-    // Draw targeting brackets (like HUD elements)
+    // Draw targeting brackets (simplified)
     function drawTargetingBrackets() {
         const rect = canvas.getBoundingClientRect();
         const time = Date.now() * 0.001;
+        const size = 25;
+        const offset = 8;
         
-        // Draw some tracking brackets around random positions
         const positions = [
             { x: rect.width * 0.25, y: rect.height * 0.35 },
-            { x: rect.width * 0.65, y: rect.height * 0.55 },
-            { x: rect.width * 0.45, y: rect.height * 0.75 }
-        ];
+            { x: rect.width * 0.65, y: rect.height * 0.55 }
+        ]; // Reduced from 3 to 2
+        
+        ctx.save();
+        ctx.strokeStyle = '#06b6d4';
+        ctx.lineWidth = 1;
         
         positions.forEach((pos, i) => {
-            const pulse = Math.sin(time * 2 + i) * 0.3 + 0.7;
-            const size = 25;
-            const offset = 8;
+            const pulse = Math.sin(time * 2 + i) * 0.2 + 0.5;
+            ctx.globalAlpha = pulse;
             
-            ctx.strokeStyle = '#06b6d4';
-            ctx.globalAlpha = 0.4 * pulse;
-            ctx.lineWidth = 1.5;
-            
-            // Top-left bracket
+            // All brackets in one path for efficiency
             ctx.beginPath();
+            // Top-left
             ctx.moveTo(pos.x - size, pos.y - size + offset);
             ctx.lineTo(pos.x - size, pos.y - size);
             ctx.lineTo(pos.x - size + offset, pos.y - size);
-            ctx.stroke();
-            
-            // Top-right bracket
-            ctx.beginPath();
+            // Top-right
             ctx.moveTo(pos.x + size - offset, pos.y - size);
             ctx.lineTo(pos.x + size, pos.y - size);
             ctx.lineTo(pos.x + size, pos.y - size + offset);
-            ctx.stroke();
-            
-            // Bottom-left bracket
-            ctx.beginPath();
+            // Bottom-left
             ctx.moveTo(pos.x - size, pos.y + size - offset);
             ctx.lineTo(pos.x - size, pos.y + size);
             ctx.lineTo(pos.x - size + offset, pos.y + size);
-            ctx.stroke();
-            
-            // Bottom-right bracket
-            ctx.beginPath();
+            // Bottom-right
             ctx.moveTo(pos.x + size - offset, pos.y + size);
             ctx.lineTo(pos.x + size, pos.y + size);
             ctx.lineTo(pos.x + size, pos.y + size - offset);
             ctx.stroke();
-            
-            ctx.globalAlpha = 1;
         });
+        ctx.restore();
     }
     
-    // Main animation loop
-    function animate() {
+    // Main animation loop with frame limiting
+    function animate(currentTime) {
+        if (!isVisible) return;
+        
+        animationId = requestAnimationFrame(animate);
+        
+        // Frame rate limiting
+        const elapsed = currentTime - lastFrameTime;
+        if (elapsed < frameInterval) return;
+        lastFrameTime = currentTime - (elapsed % frameInterval);
+        
         const rect = canvas.getBoundingClientRect();
         ctx.clearRect(0, 0, rect.width, rect.height);
         
-        drawConnections();
         drawParticles();
+        drawConnections();
         drawVehicles();
         drawDetectionPoints();
         drawTargetingBrackets();
-        
-        animationId = requestAnimationFrame(animate);
     }
     
     // Initialize
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-    animate();
+    window.addEventListener('resize', resizeCanvas, { passive: true });
+    requestAnimationFrame(animate);
     
-    // Cleanup on page unload
-    window.addEventListener('beforeunload', () => {
-        cancelAnimationFrame(animationId);
-    });
-    
-    // Reduce animation when hero section not visible (performance)
+    // Visibility-based animation control
     const heroSection = document.getElementById('hero');
     if (heroSection) {
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    if (!animationId) animate();
-                } else {
-                    cancelAnimationFrame(animationId);
-                    animationId = null;
+                isVisible = entry.isIntersecting;
+                if (isVisible && !animationId) {
+                    requestAnimationFrame(animate);
                 }
             });
-        }, { threshold: 0.1 });
+        }, { threshold: 0.05 });
         observer.observe(heroSection);
     }
+    
+    // Pause on tab hidden
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            isVisible = false;
+        } else if (heroSection && heroSection.getBoundingClientRect().top < window.innerHeight) {
+            isVisible = true;
+            requestAnimationFrame(animate);
+        }
+    });
 }
 
 // ===========================
 // SECTION BACKGROUND ENHANCEMENTS
 // ===========================
 function initSectionAnimations() {
-    // Scroll Progress Indicator
+    // Scroll Progress Indicator (throttled)
     const scrollProgress = document.getElementById('scroll-progress');
     if (scrollProgress) {
-        window.addEventListener('scroll', () => {
+        const updateScrollProgress = throttle(() => {
             const scrollTop = window.scrollY;
             const docHeight = document.documentElement.scrollHeight - window.innerHeight;
             const scrollPercent = (scrollTop / docHeight) * 100;
             scrollProgress.style.width = scrollPercent + '%';
-        });
+        }, 16); // ~60fps max
+        
+        window.addEventListener('scroll', updateScrollProgress, { passive: true });
     }
     
     // Add parallax effect to section backgrounds
@@ -350,48 +395,43 @@ function initSectionAnimations() {
     
     sections.forEach(section => sectionObserver.observe(section));
     
-    // Mouse move effect for interactive glow
-    document.addEventListener('mousemove', (e) => {
+    // Mouse move effect (heavily throttled)
+    const updateMousePos = throttle((e) => {
         const mouseX = e.clientX / window.innerWidth;
         const mouseY = e.clientY / window.innerHeight;
-        
         document.documentElement.style.setProperty('--mouse-x', mouseX);
         document.documentElement.style.setProperty('--mouse-y', mouseY);
-    });
+    }, 50); // Only update every 50ms
     
-    // Add random sparkle effects to analytics section
+    document.addEventListener('mousemove', updateMousePos, { passive: true });
+    
+    // Sparkle effects (reduced frequency, only when visible)
     const analyticsSection = document.getElementById('analytics');
     if (analyticsSection) {
-        setInterval(() => {
-            createSparkle(analyticsSection);
-        }, 3000);
+        let sparkleInterval;
+        const analyticsObserver = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) {
+                sparkleInterval = setInterval(() => createSparkle(analyticsSection), 5000);
+            } else {
+                clearInterval(sparkleInterval);
+            }
+        }, { threshold: 0.1 });
+        analyticsObserver.observe(analyticsSection);
     }
-    
-    // Add typing effect to violation numbers
-    const violationCards = document.querySelectorAll('.v-summary-card');
-    violationCards.forEach(card => {
-        card.addEventListener('mouseenter', () => {
-            card.classList.add('pulse-highlight');
-        });
-        card.addEventListener('mouseleave', () => {
-            card.classList.remove('pulse-highlight');
-        });
-    });
 }
 
 function createSparkle(container) {
+    if (document.hidden) return; // Don't create sparkles when tab is hidden
     const sparkle = document.createElement('div');
     sparkle.className = 'sparkle';
-    sparkle.style.left = Math.random() * 100 + '%';
-    sparkle.style.top = Math.random() * 100 + '%';
+    sparkle.style.cssText = `left:${Math.random() * 100}%;top:${Math.random() * 100}%`;
     container.appendChild(sparkle);
-    
     setTimeout(() => sparkle.remove(), 1000);
 }
 
-// Call the section animations init
+// Initialize section animations after DOM ready
 document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(initSectionAnimations, 100);
+    requestIdleCallback ? requestIdleCallback(initSectionAnimations) : setTimeout(initSectionAnimations, 100);
 });
 
 // ===========================
@@ -403,21 +443,26 @@ function initNavigation() {
     const navLinks = document.getElementById('nav-links');
     const allNavLinks = document.querySelectorAll('.nav-link');
 
-    // Scroll effect
-    window.addEventListener('scroll', () => {
-        if (window.scrollY > 60) {
+    // Scroll effect (throttled)
+    let lastScrollTop = 0;
+    const handleScroll = throttle(() => {
+        const scrollTop = window.scrollY;
+        if (scrollTop > 60) {
             navbar.classList.add('scrolled');
         } else {
             navbar.classList.remove('scrolled');
         }
-    });
+        lastScrollTop = scrollTop;
+    }, 16);
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
 
     // Mobile toggle
     navToggle.addEventListener('click', () => {
         navLinks.classList.toggle('open');
     });
 
-    // Active section tracking
+    // Active section tracking (using IntersectionObserver instead of scroll)
     const sections = document.querySelectorAll('section[id]');
     const observerOptions = { rootMargin: '-20% 0px -70% 0px' };
 
@@ -435,7 +480,7 @@ function initNavigation() {
 
     // Close mobile nav on link click
     allNavLinks.forEach(link => {
-        link.addEventListener('click', () => navLinks.classList.remove('open'));
+        link.addEventListener('click', () => navLinks.classList.remove('open'), { passive: true });
     });
 }
 
