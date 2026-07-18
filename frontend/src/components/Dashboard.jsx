@@ -10,7 +10,7 @@ function Dashboard() {
   const { isRunning, progress, status, results, error, startAnalysis, stopAnalysis } = useAnalysis();
   const [activeSection, setActiveSection] = useState('hero');
   const [backendOnline, setBackendOnline] = useState(false);
-  
+
   const [config, setConfig] = useState({
     video_dir: '',
     tracker: 'botsort.yaml',
@@ -18,6 +18,37 @@ function Dashboard() {
     conf_threshold: 0.25,
     speed_threshold: 50
   });
+
+  // Derive a human-readable tracker label for dynamic display
+  const trackerLabel =
+    config.tracker === 'mcat'
+      ? 'MCAT (Novel Hybrid)'
+      : config.tracker.includes('bytetrack')
+      ? 'ByteTrack'
+      : 'BoTSORT';
+
+  // Derive tracker-specific tracking settings for the System Configuration section
+  const trackerSettings =
+    config.tracker === 'mcat'
+      ? {
+          algorithm: 'MCAT',
+          buffer: 'Dynamic (Attention-Gated)',
+          matchThreshold: 'Adaptive (BoTSORT + Norfair)',
+          minTrackLength: '3 frames',
+        }
+      : config.tracker.includes('bytetrack')
+      ? {
+          algorithm: 'ByteTrack',
+          buffer: '30 frames',
+          matchThreshold: '0.8',
+          minTrackLength: '5 frames',
+        }
+      : {
+          algorithm: 'BoTSORT',
+          buffer: '30 frames',
+          matchThreshold: '0.8',
+          minTrackLength: '5 frames',
+        };
 
   // Check backend health
   useEffect(() => {
@@ -74,7 +105,7 @@ function Dashboard() {
             </span>
             <span className="logo-text">TrafficVision<span className="logo-accent">AI</span></span>
           </a>
-          
+
           <div className="nav-links">
             <span className={`nav-link ${activeSection === 'hero' ? 'active' : ''}`} onClick={() => scrollTo('hero')}>Home</span>
             <span className={`nav-link ${activeSection === 'pipeline' ? 'active' : ''}`} onClick={() => scrollTo('pipeline')}>Pipeline</span>
@@ -100,14 +131,15 @@ function Dashboard() {
         <div className="hero-content">
           <div className="hero-badge">
             <span className="badge-dot"></span>
-            <span>Powered by YOLOv12 + BoTSORT</span>
+            {/* Dynamic badge: reflects currently selected tracker */}
+            <span>Powered by YOLOv12 + {trackerLabel}</span>
           </div>
           <h1 className="hero-title">
             Intelligent Traffic<br />
             <span className="gradient-text">Violation Detection</span>
           </h1>
           <p className="hero-subtitle">
-            Real-time vehicle tracking, speed estimation with homography-based perspective correction, 
+            Real-time vehicle tracking, speed estimation with homography-based perspective correction,
             and automated violation detection — built for smart city surveillance.
           </p>
           <div className="hero-stats">
@@ -116,7 +148,7 @@ function Dashboard() {
               <span className="stat-label">Videos Analyzed</span>
             </div>
             <div className="hero-stat">
-              <span className="stat-number">95</span><span className="stat-suffix">%</span>
+              <span className="stat-number">94</span><span className="stat-suffix">%</span>
               <span className="stat-label">Detection Accuracy</span>
             </div>
             <div className="hero-stat">
@@ -159,7 +191,7 @@ function Dashboard() {
               <div className="step-content">
                 <h3 className="step-title">Dataset Collection</h3>
                 <p className="step-desc">
-                  Ingests traffic surveillance videos from multiple sources. Supports various formats (MP4, AVI, MOV) 
+                  Ingests traffic surveillance videos from multiple sources. Supports various formats (MP4, AVI, MOV)
                   and handles high-resolution feeds for optimal detection accuracy.
                 </p>
                 <div className="step-tags">
@@ -178,32 +210,45 @@ function Dashboard() {
               <div className="step-content">
                 <h3 className="step-title">Feature Extraction</h3>
                 <p className="step-desc">
-                  Uses YOLOv11 deep learning models to extract vehicle features and bounding boxes. 
-                  Detects cars, trucks, motorcycles, buses, and bicycles with 95%+ accuracy.
+                  Uses YOLOv12 deep learning models to extract vehicle features and bounding boxes.
+                  Detects cars, trucks, motorcycles, buses, and bicycles with 92%+ accuracy.
                 </p>
                 <div className="step-tags">
-                  <span className="step-tag">YOLO11</span>
+                  <span className="step-tag">YOLO12</span>
                   <span className="step-tag">5 Vehicle Classes</span>
                   <span className="step-tag">Real-time</span>
                 </div>
               </div>
             </div>
 
-            {/* Step 3 */}
+            {/* Step 3 — dynamic content based on selected tracker */}
             <div className="pipeline-step">
               <div className="step-icon step-icon-purple">
                 <Target size={28} />
               </div>
               <div className="step-content">
                 <h3 className="step-title">Detection & Tracking</h3>
-                <p className="step-desc">
-                  BoTSORT tracking algorithm assigns unique IDs to vehicles and maintains trajectories across frames. 
-                  Handles occlusions, camera movement, and complex traffic scenarios.
-                </p>
+                {config.tracker === 'mcat' ? (
+                  <p className="step-desc">
+                    MCAT tracking algorithm assigns unique IDs to vehicles and maintains trajectories across frames.
+                    Handles occlusions, camera movement, and complex traffic scenarios using advanced gatekeeper logic.
+                  </p>
+                ) : config.tracker.includes('bytetrack') ? (
+                  <p className="step-desc">
+                    ByteTrack tracking algorithm assigns unique IDs to vehicles and maintains trajectories across frames.
+                    Handles occlusions and complex traffic scenarios using byte-level association.
+                  </p>
+                ) : (
+                  <p className="step-desc">
+                    BoTSORT tracking algorithm assigns unique IDs to vehicles and maintains trajectories across frames.
+                    Handles occlusions, camera movement, and complex traffic scenarios.
+                  </p>
+                )}
                 <div className="step-tags">
-                  <span className="step-tag">BoTSORT</span>
+                  <span className="step-tag">{trackerLabel}</span>
                   <span className="step-tag">Multi-Object</span>
                   <span className="step-tag">Occlusion Handling</span>
+                  {config.tracker === 'mcat' && <span className="step-tag">Attention-Gated Routing</span>}
                 </div>
               </div>
             </div>
@@ -216,7 +261,7 @@ function Dashboard() {
               <div className="step-content">
                 <h3 className="step-title">Speed Estimation</h3>
                 <p className="step-desc">
-                  Homography-based perspective correction transforms pixel coordinates to real-world distances. 
+                  Homography-based perspective correction transforms pixel coordinates to real-world distances.
                   Calculates speeds using trajectory analysis and frame timestamps.
                 </p>
                 <div className="step-tags">
@@ -235,7 +280,7 @@ function Dashboard() {
               <div className="step-content">
                 <h3 className="step-title">Violation Detection & Reporting</h3>
                 <p className="step-desc">
-                  Compares vehicle speeds against configurable thresholds. Generates detailed reports with 
+                  Compares vehicle speeds against configurable thresholds. Generates detailed reports with
                   timestamps, vehicle IDs, speeds, and severity classifications for enforcement.
                 </p>
                 <div className="step-tags">
@@ -305,7 +350,7 @@ function Dashboard() {
                 <Settings size={20} />
                 System Configuration
               </div>
-              
+
               <form onSubmit={handleSubmit}>
                 <div className="form-group">
                   <label className="form-label">Video Directory</label>
@@ -325,6 +370,7 @@ function Dashboard() {
                   <select name="tracker" className="form-select" value={config.tracker} onChange={handleInputChange} disabled={isRunning}>
                     <option value="botsort.yaml">BoTSORT (Advanced)</option>
                     <option value="bytetrack.yaml">ByteTrack</option>
+                    <option value="mcat">MCAT (Novel Hybrid)</option>
                   </select>
                 </div>
 
@@ -476,7 +522,7 @@ function Dashboard() {
               <div className="config-items">
                 <div className="config-item">
                   <span className="config-key">Model Architecture</span>
-                  <span className="config-value">YOLOv11 Nano</span>
+                  <span className="config-value">YOLOv12</span>
                 </div>
                 <div className="config-item">
                   <span className="config-key">Input Resolution</span>
@@ -484,7 +530,7 @@ function Dashboard() {
                 </div>
                 <div className="config-item">
                   <span className="config-key">Confidence Threshold</span>
-                  <span className="config-value">0.25</span>
+                  <span className="config-value">{config.conf_threshold}</span>
                 </div>
                 <div className="config-item">
                   <span className="config-key">IOU Threshold</span>
@@ -493,7 +539,7 @@ function Dashboard() {
               </div>
             </div>
 
-            {/* Tracking Settings */}
+            {/* Tracking Settings — dynamic based on selected tracker */}
             <div className="config-section">
               <h3 className="config-section-title">
                 <Activity size={20} />
@@ -502,19 +548,19 @@ function Dashboard() {
               <div className="config-items">
                 <div className="config-item">
                   <span className="config-key">Tracker Algorithm</span>
-                  <span className="config-value">BoTSORT</span>
+                  <span className="config-value">{trackerSettings.algorithm}</span>
                 </div>
                 <div className="config-item">
                   <span className="config-key">Track Buffer</span>
-                  <span className="config-value">30 frames</span>
+                  <span className="config-value">{trackerSettings.buffer}</span>
                 </div>
                 <div className="config-item">
                   <span className="config-key">Match Threshold</span>
-                  <span className="config-value">0.8</span>
+                  <span className="config-value">{trackerSettings.matchThreshold}</span>
                 </div>
                 <div className="config-item">
                   <span className="config-key">Min Track Length</span>
-                  <span className="config-value">5 frames</span>
+                  <span className="config-value">{trackerSettings.minTrackLength}</span>
                 </div>
               </div>
             </div>
@@ -548,9 +594,9 @@ function Dashboard() {
 
           {/* System Visualization */}
           <div className="system-visual">
-            <img 
-              src="/traffic_analysis.png" 
-              alt="Traffic Analysis Visualization" 
+            <img
+              src="/traffic_analysis.png"
+              alt="Traffic Analysis Visualization"
               className="system-visual-img"
             />
           </div>
